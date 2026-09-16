@@ -34,7 +34,7 @@
         #warning-msg { position: absolute; top: 40%; width: 100%; text-align: center; color: #ff3b3b; font-size: 32px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 20px 0; display: none; z-index: 300; }
 
         #calib-target { position: absolute; width: 40px; height: 40px; background-color: #e74c3c; border: 4px solid white; border-radius: 50%; transform: translate(-50%, -50%); display: none; z-index: 210; box-shadow: 0 0 15px #e74c3c; }
-        #calib-instruction { position: absolute; bottom: 20%; width: 100%; text-align: center; font-size: 28px; font-weight: bold; color: #f1c40f; display: none; z-index: 210; }
+        #calib-instruction { position: absolute; bottom: 20%; width: 100%; text-align: center; font-size: 28px; font-weight: bold; color: #f1c40f; display: none; z-index: 210; text-shadow: 2px 2px 4px #000; }
     </style>
 </head>
 <body>
@@ -61,7 +61,7 @@
     </div>
 
     <div id="calib-target"></div>
-    <div id="calib-instruction">赤い丸を見つめてください...</div>
+    <div id="calib-instruction">顔を動かして赤い丸を指してください...</div>
 
     <script>
         const textOutput = document.getElementById('text-output');
@@ -130,18 +130,14 @@
         
         let cursorX = window.innerWidth / 2;
         let cursorY = window.innerHeight / 2;
-        let isBlinking = false;
-        let lastBlinkTime = 0;
+        let isWinking = false;
+        let lastWinkTime = 0;
         let hoveredElement = null;
 
         let calibData = {
             center: {x:0, y:0}, top: {x:0, y:0}, bottom: {x:0, y:0}, left: {x:0, y:0}, right: {x:0, y:0}
         };
         let calibBuffer = [];
-        
-        // ★ 震え防止用：直近15フレームの視線位置を記憶する配列 ★
-        const SMOOTHING_FRAMES = 15;
-        let gazeHistory = [];
 
         function calculateEAR(landmarks, eyeIndices) {
             const pLeft = landmarks[eyeIndices[0]]; const pRight = landmarks[eyeIndices[1]];
@@ -151,27 +147,13 @@
             return vDist / hDist;
         }
 
-        function getGazeRatio(landmarks) {
-            function getEyeRatio(inner, outer, top, bottom, iris) {
-                const eyeWidth = Math.hypot(inner.x - outer.x, inner.y - outer.y);
-                const eyeHeight = Math.hypot(bottom.x - top.x, bottom.y - top.y);
-                const hRatio = Math.abs(iris.x - outer.x) / eyeWidth;
-                const vRatio = Math.abs(iris.y - top.y) / eyeHeight;
-                return { x: hRatio, y: vRatio };
-            }
-            const leftRatio = getEyeRatio(landmarks[133], landmarks[33], landmarks[159], landmarks[145], landmarks[468]);
-            const rightRatio = getEyeRatio(landmarks[362], landmarks[263], landmarks[386], landmarks[374], landmarks[473]);
-            return { x: (leftRatio.x + rightRatio.x) / 2, y: (leftRatio.y + rightRatio.y) / 2 };
-        }
-
-        // ★ 暴走ストッパー：キャリブレーション結果を画面座標に安全に変換する関数 ★
         function mapRange(value, inMin, inMax, outMin, outMax) {
             const range = inMax - inMin;
-            // 目の動きが小さすぎて差分がほとんどない場合は中央に固定する
-            if (Math.abs(range) < 0.003) return (outMin + outMax) / 2; 
+            // 可動域が極端に狭い場合のゼロ除算・暴走防止
+            if (Math.abs(range) < 0.01) return (outMin + outMax) / 2; 
             
             let ratio = (value - inMin) / range;
-            // 画面の端から外に飛び出さないように制限 (少しだけ遊びを持たせる)
+            // 画面外に少しだけはみ出せるように遊びを持たせる（端のボタンを押しやすくするため）
             ratio = Math.max(-0.1, Math.min(1.1, ratio));
             return outMin + (outMax - outMin) * ratio;
         }
@@ -184,7 +166,7 @@
             statusSub.style.display = 'none';
             startBtn.style.display = 'none';
             
-            runCalibrationStep('center', 50, 50, '画面中央の赤い丸を見つめてください');
+            runCalibrationStep('center', 50, 50, '顔を動かして、\n画面【中央】の赤い丸に鼻先を向けてください');
         });
 
         function runCalibrationStep(step, xPercent, yPercent, message) {
@@ -198,7 +180,7 @@
             calibTarget.style.top = `${yPercent}%`;
 
             setTimeout(() => {
-                calibInstruction.innerText = "記録中...頭を動かさず目だけで見つめてください";
+                calibInstruction.innerText = "記録中...そのまま顔を止めてください";
                 setTimeout(() => {
                     let avgX = 0, avgY = 0;
                     if(calibBuffer.length > 0) {
@@ -206,27 +188,26 @@
                         calibData[step] = { x: avgX / calibBuffer.length, y: avgY / calibBuffer.length };
                     }
                     
-                    if(step === 'center') runCalibrationStep('top', 50, 10, '画面「上」の赤い丸を見つめてください');
-                    else if(step === 'top') runCalibrationStep('bottom', 50, 90, '画面「下」の赤い丸を見つめてください');
-                    else if(step === 'bottom') runCalibrationStep('left', 10, 50, '画面「左」の赤い丸を見つめてください');
-                    else if(step === 'left') runCalibrationStep('right', 90, 50, '画面「右」の赤い丸を見つめてください');
+                    if(step === 'center') runCalibrationStep('top', 50, 10, '顔を上に向けて、\n画面【上端】の赤い丸に鼻先を向けてください');
+                    else if(step === 'top') runCalibrationStep('bottom', 50, 90, '顔を下に向けて、\n画面【下端】の赤い丸に鼻先を向けてください');
+                    else if(step === 'bottom') runCalibrationStep('left', 10, 50, '顔を左に向けて、\n画面【左端】の赤い丸に鼻先を向けてください');
+                    else if(step === 'left') runCalibrationStep('right', 90, 50, '顔を右に向けて、\n画面【右端】の赤い丸に鼻先を向けてください');
                     else if(step === 'right') {
                         calibTarget.style.display = 'none';
                         calibInstruction.style.display = 'none';
                         statusOverlay.style.display = 'none';
                         cursor.style.display = 'block';
                         gameState = 'playing';
-                        gazeHistory = []; // ヒストリーをリセット
                     }
-                }, 2000);
-            }, 1000);
+                }, 1500); // 1.5秒間記録
+            }, 1000); // 1秒間待機
         }
 
         function onResults(results) {
             if (gameState === 'loading') {
                 gameState = 'ready';
                 statusText.innerText = "準備完了";
-                statusSub.innerText = "顔を動かさず「目だけ」で操作するモードです。\n音声の準備をするため、下のボタンを押してください。";
+                statusSub.innerText = "鼻先の動きでカーソルを操作し、「右目」のウインクで決定します。\n音声の準備をするため、下のボタンを押してください。";
                 startBtn.style.display = 'block';
             }
 
@@ -241,42 +222,31 @@
                     warningMsg.style.display = 'none';
                 }
 
-                const gaze = getGazeRatio(landmarks);
+                // 鼻先の座標を取得（インデックス1）
+                const nose = landmarks[1];
 
                 if (gameState.startsWith('calib_')) {
                     if (calibInstruction.innerText.includes("記録中")) {
-                        calibBuffer.push(gaze);
+                        calibBuffer.push({ x: nose.x, y: nose.y });
                     }
                 } 
                 else if (gameState === 'playing') {
-                    // --- 視線マッピングと移動平均（スムージング） ---
+                    // --- 1. 鼻先の位置を画面座標に変換（キャリブレーション使用） ---
                     
-                    // キャリブレーションの左右（10%と90%の位置）を基準に変換
-                    let tx = mapRange(gaze.x, calibData.left.x, calibData.right.x, 0.1, 0.9);
-                    let ty = mapRange(gaze.y, calibData.top.y, calibData.bottom.y, 0.1, 0.9);
+                    // X座標: 左右のキャリブレーション結果を基準に、画面の10%〜90%にマッピング
+                    let targetX = mapRange(nose.x, calibData.left.x, calibData.right.x, window.innerWidth * 0.1, window.innerWidth * 0.9);
+                    
+                    // Y座標: 上下のキャリブレーション結果を基準に、画面の10%〜90%にマッピング
+                    let targetY = mapRange(nose.y, calibData.top.y, calibData.bottom.y, window.innerHeight * 0.1, window.innerHeight * 0.9);
 
-                    // 履歴に追加して、古いものを捨てる
-                    gazeHistory.push({x: tx, y: ty});
-                    if (gazeHistory.length > SMOOTHING_FRAMES) gazeHistory.shift();
-
-                    // 履歴の平均値を出すことで、ブルブル震えるノイズを吸収する
-                    let avgTx = 0, avgTy = 0;
-                    gazeHistory.forEach(g => { avgTx += g.x; avgTy += g.y; });
-                    avgTx /= gazeHistory.length;
-                    avgTy /= gazeHistory.length;
-
-                    // 画面のピクセル座標に変換
-                    let targetX = window.innerWidth * avgTx;
-                    let targetY = window.innerHeight * avgTy;
-
-                    // さらにローパスフィルタで滑らかに動かす
-                    cursorX += (targetX - cursorX) * 0.15;
-                    cursorY += (targetY - cursorY) * 0.15;
+                    // ローパスフィルタで滑らかにカーソルを追従させる
+                    cursorX += (targetX - cursorX) * 0.2;
+                    cursorY += (targetY - cursorY) * 0.2;
 
                     cursor.style.left = `${cursorX}px`;
                     cursor.style.top = `${cursorY}px`;
 
-                    // --- ハイライト処理 ---
+                    // --- 2. ハイライト処理 ---
                     const elementUnderCursor = document.elementFromPoint(cursorX, cursorY);
                     if (hoveredElement && hoveredElement !== elementUnderCursor) {
                         hoveredElement.classList.remove('hovered');
@@ -288,28 +258,38 @@
                         hoveredElement = null;
                     }
 
-                    // --- まばたき検知 ---
-                    const leftEyeIndices = [33, 133, 159, 145];
-                    const rightEyeIndices = [362, 263, 386, 374];
-                    const avgEAR = (calculateEAR(landmarks, leftEyeIndices) + calculateEAR(landmarks, rightEyeIndices)) / 2;
+                    // --- 3. 【右目】のウインク検知 ---
+                    const leftEyeIndices = [33, 133, 159, 145]; // ユーザーの左目
+                    const rightEyeIndices = [362, 263, 386, 374]; // ユーザーの右目
+                    
+                    const leftEAR = calculateEAR(landmarks, leftEyeIndices);
+                    const rightEAR = calculateEAR(landmarks, rightEyeIndices);
 
-                    const BLINK_THRESHOLD = 0.15; 
+                    // 閾値（目は開いていると0.25以上、閉じると0.15以下になることが多い）
+                    const CLOSED_THRESHOLD = 0.16; 
+                    const OPEN_THRESHOLD = 0.22;
                     const now = Date.now();
 
-                    // まばたき連打防止（1.2秒）
-                    if (avgEAR < BLINK_THRESHOLD && !isBlinking && (now - lastBlinkTime > 1200)) { 
-                        isBlinking = true;
-                        lastBlinkTime = now;
+                    // 判定条件：右目が閉じていて、かつ、左目が開いている（＝ウインク）
+                    const isRightEyeClosed = rightEAR < CLOSED_THRESHOLD;
+                    const isLeftEyeOpen = leftEAR > OPEN_THRESHOLD;
 
+                    if (isRightEyeClosed && isLeftEyeOpen && !isWinking && (now - lastWinkTime > 1000)) { 
+                        isWinking = true;
+                        lastWinkTime = now;
+
+                        // カーソルエフェクト
                         cursor.classList.add('blink');
                         setTimeout(() => cursor.classList.remove('blink'), 200);
 
+                        // 決定アクション
                         if (hoveredElement) {
                             triggerAction(hoveredElement);
                         }
                     } 
-                    else if (avgEAR > BLINK_THRESHOLD + 0.05) {
-                        isBlinking = false;
+                    // 右目が開いたらフラグをリセット
+                    else if (rightEAR > CLOSED_THRESHOLD + 0.05) {
+                        isWinking = false;
                     }
                 }
             } else {
