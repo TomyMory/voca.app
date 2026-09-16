@@ -27,20 +27,24 @@
         #key-speak { background-color: #27ae60; }
         #key-mod { background-color: #8e44ad; }
 
-        #cursor { position: absolute; top: 50%; left: 50%; width: 30px; height: 30px; background-color: rgba(231, 76, 60, 0.8); border: 3px solid white; border-radius: 50%; transform: translate(-50%, -50%); z-index: 1500; pointer-events: none; transition: width 0.1s, height 0.1s; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        #cursor { position: absolute; top: 50%; left: 50%; width: 30px; height: 30px; background-color: rgba(231, 76, 60, 0.8); border: 3px solid white; border-radius: 50%; transform: translate(-50%, -50%); z-index: 1500; pointer-events: none; transition: width 0.1s, height 0.1s, opacity 0.2s; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
         #cursor.ready { background-color: #3498db; width: 45px; height: 45px; border: 4px solid #fff; }
         #cursor.blink { background-color: #2ecc71; width: 60px; height: 60px; }
 
         video { display: none; }
         
+        /* ★ フリックメニュー（四角に変更＆サイズ最適化） ★ */
         #flick-overlay { position: absolute; z-index: 1000; display: none; pointer-events: none; }
-        .flick-petal { position: absolute; width: 90px; height: 90px; background: #2980b9; border: 4px solid white; border-radius: 50%; color: white; display: flex; justify-content: center; align-items: center; font-size: 40px; font-weight: bold; transform: translate(-50%, -50%); transition: 0.1s; pointer-events: auto; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
-        .flick-petal.hovered { background: #f1c40f; color: #2c3e50; transform: translate(-50%, -50%) scale(1.15); border-color: #2c3e50; z-index: 1001; }
+        .flick-petal { position: absolute; width: 80px; height: 80px; background: #2980b9; border: 4px solid white; border-radius: 15px; color: white; display: flex; justify-content: center; align-items: center; font-size: 40px; font-weight: bold; transform: translate(-50%, -50%); transition: 0.1s; pointer-events: auto; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        
+        /* 選択されている時のスタイル */
+        .flick-petal.active { background: #f1c40f; color: #2c3e50; transform: translate(-50%, -50%) scale(1.15); border-color: #2c3e50; z-index: 1001; }
+        
         .petal-c { top: 0; left: 0; background: #e74c3c; z-index: 1000; }
-        .petal-l { top: 0; left: -110px; }
-        .petal-t { top: -110px; left: 0; }
-        .petal-r { top: 0; left: 110px; }
-        .petal-b { top: 110px; left: 0; }
+        .petal-l { top: 0; left: -90px; }
+        .petal-t { top: -90px; left: 0; }
+        .petal-r { top: 0; left: 90px; }
+        .petal-b { top: 90px; left: 0; }
 
         #status-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; text-align: center; }
         #start-btn { padding: 15px 30px; font-size: 24px; background-color: #3498db; color: white; border: none; border-radius: 10px; cursor: pointer; margin-top: 20px; display: none; }
@@ -48,7 +52,9 @@
 
         #calib-target { position: absolute; width: 40px; height: 40px; background-color: #e74c3c; border: 4px solid white; border-radius: 50%; transform: translate(-50%, -50%); display: none; z-index: 2100; box-shadow: 0 0 15px #e74c3c; }
         #practice-target { position: absolute; width: 160px; height: 160px; background-color: #e67e22; border: 4px solid white; border-radius: 20px; transform: translate(-50%, -50%); display: none; z-index: 2100; box-shadow: 0 0 20px rgba(230,126,34,0.8); flex-direction: column; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; text-align: center; color: white; transition: 0.2s; }
-        #calib-instruction { position: absolute; bottom: 15%; width: 100%; text-align: center; font-size: 28px; font-weight: bold; color: #f1c40f; display: none; z-index: 2100; text-shadow: 2px 2px 4px #000; white-space: pre-wrap; }
+        
+        /* ★ 指示テキストを画面上部に移動し、的と被らないように修正 ★ */
+        #calib-instruction { position: absolute; top: 10%; width: 100%; text-align: center; font-size: 28px; font-weight: bold; color: #f1c40f; display: none; z-index: 2100; text-shadow: 2px 2px 4px #000; white-space: pre-wrap; }
     </style>
 </head>
 <body>
@@ -58,7 +64,6 @@
     </div>
 
     <div id="keyboard">
-        <!-- 4x4 Grid Layout -->
         <div class="key base-key" data-base="あ"><div class="main-char">あ</div><div class="sub-chars">い う え お</div></div>
         <div class="key base-key" data-base="か"><div class="main-char">か</div><div class="sub-chars">き く け こ</div></div>
         <div class="key base-key" data-base="さ"><div class="main-char">さ</div><div class="sub-chars">し す せ そ</div></div>
@@ -80,7 +85,6 @@
         <div class="key ctrl-btn" id="key-speak" data-action="speak"><div class="main-char">🗣</div><div class="sub-chars">はなす</div></div>
     </div>
 
-    <!-- フリック入力展開用オーバーレイ -->
     <div id="flick-overlay">
         <div class="flick-petal petal-c" id="petal-c"></div>
         <div class="flick-petal petal-l" id="petal-l"></div>
@@ -104,7 +108,6 @@
     <div id="calib-instruction">顔を動かして赤い丸を指してください...</div>
 
     <script>
-        // エラー検知の安全装置
         window.onerror = function(message, source, lineno, colno, error) {
             const statusText = document.getElementById('status-text');
             const statusSub = document.getElementById('status-sub');
@@ -191,14 +194,19 @@
         let isMouthOpen = false;
         let lastClickTime = 0;
         let hoveredElement = null;
+        
+        // フリック専用の管理変数
         let activeFlickBase = null;
+        let flickStartX = 0;
+        let flickStartY = 0;
+        let currentFlickSelection = 'c';
 
         let calibData = { center: {x:0, y:0}, top: {x:0, y:0}, bottom: {x:0, y:0}, left: {x:0, y:0}, right: {x:0, y:0} };
         let calibBuffer = [];
         
         const practiceSteps = [
             { id: 'practice_center', x: 50, y: 50, msg: "【練習 1/5】\n中央の的を見て、\n「口をあけて、とじる」と決定します" },
-            { id: 'practice_top', x: 50, y: 20, msg: "【練習 2/5】\n画面「上」の的を見て、\n口で決定してください" },
+            { id: 'practice_top', x: 50, y: 30, msg: "【練習 2/5】\n画面「上」の的を見て、\n口で決定してください" },
             { id: 'practice_bottom', x: 50, y: 80, msg: "【練習 3/5】\n画面「下」の的を見て、\n口で決定してください" },
             { id: 'practice_left', x: 20, y: 50, msg: "【練習 4/5】\n画面「左」の的を見て、\n口で決定してください" },
             { id: 'practice_right', x: 80, y: 50, msg: "【練習 5/5】\n画面「右」の的を見て、\n口で決定してください" }
@@ -216,12 +224,9 @@
         startBtn.addEventListener('click', () => {
             speechSynthesis.speak(new SpeechSynthesisUtterance('')); audioUnlocked = true;
             statusOverlay.style.background = 'rgba(0,0,0,0.5)';
-            
-            // ★ 前回のバグ修正箇所：安全にIDから取得して非表示にする ★
             document.getElementById('status-text').style.display = 'none'; 
             document.getElementById('status-sub').style.display = 'none'; 
             startBtn.style.display = 'none';
-            
             runCalibrationStep('center', 50, 50, '顔を動かして、\n画面【中央】の赤い丸に鼻先を向けてください');
         });
 
@@ -237,10 +242,10 @@
                     let avgX = 0, avgY = 0;
                     if(calibBuffer.length > 0) { calibBuffer.forEach(d => { avgX += d.x; avgY += d.y; }); calibData[step] = { x: avgX / calibBuffer.length, y: avgY / calibBuffer.length }; }
                     
-                    if(step === 'center') runCalibrationStep('top', 50, 10, '顔を上に向けて、\n画面【上端】の赤い丸に鼻先を向けてください');
-                    else if(step === 'top') runCalibrationStep('bottom', 50, 90, '顔を下に向けて、\n画面【下端】の赤い丸に鼻先を向けてください');
-                    else if(step === 'bottom') runCalibrationStep('left', 10, 50, '顔を左に向けて、\n画面【左端】の赤い丸に鼻先を向けてください');
-                    else if(step === 'left') runCalibrationStep('right', 90, 50, '顔を右に向けて、\n画面【右端】の赤い丸に鼻先を向けてください');
+                    if(step === 'center') runCalibrationStep('top', 50, 20, '顔を上に向けて、\n画面【上部】の赤い丸に鼻先を向けてください');
+                    else if(step === 'top') runCalibrationStep('bottom', 50, 80, '顔を下に向けて、\n画面【下部】の赤い丸に鼻先を向けてください');
+                    else if(step === 'bottom') runCalibrationStep('left', 20, 50, '顔を左に向けて、\n画面【左部】の赤い丸に鼻先を向けてください');
+                    else if(step === 'left') runCalibrationStep('right', 80, 50, '顔を右に向けて、\n画面【右部】の赤い丸に鼻先を向けてください');
                     else if(step === 'right') {
                         calibTarget.style.display = 'none';
                         startPracticePhase();
@@ -269,9 +274,25 @@
 
         function showFlickMenu(baseChar, keyElement) {
             activeFlickBase = baseChar;
+            // 展開時のカーソル位置を記録（ここを基準にして選択する）
+            flickStartX = cursorX;
+            flickStartY = cursorY;
+            currentFlickSelection = 'c';
+            
+            // カーソルを消す
+            cursor.style.opacity = '0';
+
             const rect = keyElement.getBoundingClientRect();
-            flickOverlay.style.left = `${rect.left + rect.width/2}px`;
-            flickOverlay.style.top = `${rect.top + rect.height/2}px`;
+            let fx = rect.left + rect.width/2;
+            let fy = rect.top + rect.height/2;
+            
+            // ★ 見切れ防止：画面の端に近すぎる場合はメニューを内側にズラす ★
+            const safeMargin = 140; // メニューがはみ出ないための安全距離
+            fx = Math.max(safeMargin, Math.min(window.innerWidth - safeMargin, fx));
+            fy = Math.max(safeMargin, Math.min(window.innerHeight - safeMargin, fy));
+
+            flickOverlay.style.left = `${fx}px`;
+            flickOverlay.style.top = `${fy}px`;
             
             const map = flickMap[baseChar];
             const petals = ['c', 'l', 't', 'r', 'b'];
@@ -280,6 +301,10 @@
                 petalElem.innerText = map[p];
                 petalElem.dataset.char = map[p];
                 if(map[p] === '小') { petalElem.style.opacity = '0.5'; } else { petalElem.style.opacity = '1'; }
+                
+                // 初期状態はセンターをハイライト
+                if (p === 'c') petalElem.classList.add('active');
+                else petalElem.classList.remove('active');
             });
             flickOverlay.style.display = 'block';
         }
@@ -287,10 +312,7 @@
         function hideFlickMenu() {
             activeFlickBase = null;
             flickOverlay.style.display = 'none';
-            if (hoveredElement && hoveredElement.classList.contains('flick-petal')) {
-                hoveredElement.classList.remove('hovered');
-                hoveredElement = null;
-            }
+            cursor.style.opacity = '1'; // カーソル復活
         }
 
         function onResults(results) {
@@ -316,22 +338,61 @@
                     if (calibInstruction.innerText.includes("記録中")) calibBuffer.push({ x: nose.x, y: nose.y });
                 } 
                 else if (gameState.startsWith('practice_') || gameState === 'playing') {
+                    // --- カーソル移動 ---
                     let targetX = mapRange(nose.x, calibData.left.x, calibData.right.x, window.innerWidth * 0.1, window.innerWidth * 0.9);
                     let targetY = mapRange(nose.y, calibData.top.y, calibData.bottom.y, window.innerHeight * 0.1, window.innerHeight * 0.9);
+                    
+                    // ★ 下方向の感度ブースト（下を向く負担を減らす） ★
+                    const centerY = window.innerHeight / 2;
+                    if (targetY > centerY) {
+                        targetY = centerY + (targetY - centerY) * 1.5; 
+                    }
+                    // はみ出し補正
+                    targetX = Math.max(0, Math.min(window.innerWidth, targetX));
+                    targetY = Math.max(0, Math.min(window.innerHeight, targetY));
+
                     cursorX += (targetX - cursorX) * 0.2; cursorY += (targetY - cursorY) * 0.2;
                     cursor.style.left = `${cursorX}px`; cursor.style.top = `${cursorY}px`;
 
-                    const elementUnderCursor = document.elementFromPoint(cursorX, cursorY);
-                    if (hoveredElement && hoveredElement !== elementUnderCursor) {
-                        hoveredElement.classList.remove('hovered');
-                    }
-                    if (elementUnderCursor && (elementUnderCursor.classList.contains('key') || elementUnderCursor.classList.contains('ctrl-btn') || elementUnderCursor.classList.contains('flick-petal') || elementUnderCursor.id === 'practice-target')) {
-                        elementUnderCursor.classList.add('hovered');
-                        hoveredElement = elementUnderCursor;
-                    } else {
-                        hoveredElement = null;
+                    // --- フリック入力中（展開中）の選択ロジック ---
+                    if (activeFlickBase) {
+                        // 展開した場所（flickStartX, Y）からの移動量で判定する
+                        const dx = cursorX - flickStartX;
+                        const dy = cursorY - flickStartY;
+                        const threshold = window.innerWidth * 0.05; // 遊び（不感帯）
+
+                        if (Math.hypot(dx, dy) < threshold) {
+                            currentFlickSelection = 'c';
+                        } else {
+                            if (Math.abs(dx) > Math.abs(dy)) {
+                                currentFlickSelection = dx < 0 ? 'l' : 'r';
+                            } else {
+                                currentFlickSelection = dy < 0 ? 't' : 'b';
+                            }
+                        }
+
+                        // 対応する花びらをハイライト
+                        ['c', 'l', 't', 'r', 'b'].forEach(p => {
+                            const petal = document.getElementById(`petal-${p}`);
+                            if (p === currentFlickSelection) petal.classList.add('active');
+                            else petal.classList.remove('active');
+                        });
+                    } 
+                    // --- 通常時のハイライト処理 ---
+                    else {
+                        const elementUnderCursor = document.elementFromPoint(cursorX, cursorY);
+                        if (hoveredElement && hoveredElement !== elementUnderCursor) {
+                            hoveredElement.classList.remove('hovered');
+                        }
+                        if (elementUnderCursor && (elementUnderCursor.classList.contains('key') || elementUnderCursor.classList.contains('ctrl-btn') || elementUnderCursor.id === 'practice-target')) {
+                            elementUnderCursor.classList.add('hovered');
+                            hoveredElement = elementUnderCursor;
+                        } else {
+                            hoveredElement = null;
+                        }
                     }
 
+                    // --- 口の開閉判定 ---
                     const upperLip = landmarks[13]; const lowerLip = landmarks[14];
                     const mouthRatio = Math.hypot(upperLip.x - lowerLip.x, upperLip.y - lowerLip.y) / faceHeight;
                     const MOUTH_OPEN_THRESH = 0.055; 
@@ -341,6 +402,7 @@
                         if (!isMouthOpen) {
                             isMouthOpen = true;
                             cursor.classList.add('ready');
+                            // フリックメニューの展開
                             if (gameState === 'playing' && hoveredElement && hoveredElement.classList.contains('base-key')) {
                                 showFlickMenu(hoveredElement.dataset.base, hoveredElement);
                             }
@@ -353,18 +415,18 @@
                         const now = Date.now();
                         if (now - lastClickTime > 600) { 
                             lastClickTime = now;
-                            cursor.classList.add('blink');
-                            setTimeout(() => cursor.classList.remove('blink'), 200);
-
+                            
+                            // フリック決定
                             if (activeFlickBase) {
-                                let charToInput = flickMap[activeFlickBase].c;
-                                if (hoveredElement && hoveredElement.classList.contains('flick-petal')) {
-                                    charToInput = hoveredElement.dataset.char;
-                                }
+                                let charToInput = flickMap[activeFlickBase][currentFlickSelection];
                                 triggerInput(charToInput);
                                 hideFlickMenu();
                             } 
+                            // 通常ボタンの決定
                             else if (hoveredElement) {
+                                cursor.classList.add('blink');
+                                setTimeout(() => cursor.classList.remove('blink'), 200);
+
                                 if (gameState.startsWith('practice_') && hoveredElement.id === 'practice-target') {
                                     advancePractice();
                                 } else if (gameState === 'playing' && hoveredElement.classList.contains('ctrl-btn')) {
@@ -373,7 +435,7 @@
                             }
                         }
                     } 
-                    else if (!isMouthOpen) {
+                    else if (!isMouthOpen && !activeFlickBase) {
                         cursor.classList.remove('ready');
                     }
                 }
@@ -382,12 +444,14 @@
             }
         }
 
+        // マウスや指でのタップもサポート
         document.querySelectorAll('.key, .ctrl-btn, .flick-petal').forEach(btn => {
             btn.addEventListener('click', () => {
                 if(btn.classList.contains('flick-petal')) {
                     triggerInput(btn.dataset.char);
                     hideFlickMenu();
                 } else if(btn.classList.contains('base-key')) {
+                    // タップ時はセンターキーを入力
                     triggerInput(flickMap[btn.dataset.base].c);
                 } else {
                     triggerAction(btn);
