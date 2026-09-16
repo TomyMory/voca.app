@@ -17,7 +17,6 @@
         .key .main-char { font-size: 45px; pointer-events: none; }
         .key .sub-chars { font-size: 16px; color: #95a5a6; margin-top: 5px; pointer-events: none; }
         
-        /* ホバー時のアニメーション */
         .key.hovered, .ctrl-btn.hovered, #practice-target.hovered { background-color: #f1c40f !important; color: #2c3e50 !important; transform: scale(1.05); }
         #practice-target.hovered { transform: translate(-50%, -50%) scale(1.1) !important; }
 
@@ -34,7 +33,6 @@
 
         video { display: none; }
         
-        /* フリックメニュー用のスタイル */
         #flick-overlay { position: absolute; z-index: 1000; display: none; pointer-events: none; }
         .flick-petal { position: absolute; width: 90px; height: 90px; background: #2980b9; border: 4px solid white; border-radius: 50%; color: white; display: flex; justify-content: center; align-items: center; font-size: 40px; font-weight: bold; transform: translate(-50%, -50%); transition: 0.1s; pointer-events: auto; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
         .flick-petal.hovered { background: #f1c40f; color: #2c3e50; transform: translate(-50%, -50%) scale(1.15); border-color: #2c3e50; z-index: 1001; }
@@ -50,8 +48,6 @@
 
         #calib-target { position: absolute; width: 40px; height: 40px; background-color: #e74c3c; border: 4px solid white; border-radius: 50%; transform: translate(-50%, -50%); display: none; z-index: 2100; box-shadow: 0 0 15px #e74c3c; }
         #practice-target { position: absolute; width: 160px; height: 160px; background-color: #e67e22; border: 4px solid white; border-radius: 20px; transform: translate(-50%, -50%); display: none; z-index: 2100; box-shadow: 0 0 20px rgba(230,126,34,0.8); flex-direction: column; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; text-align: center; color: white; transition: 0.2s; }
-        
-        /* white-space: pre-wrap を指定して \n で改行されるようにする */
         #calib-instruction { position: absolute; bottom: 15%; width: 100%; text-align: center; font-size: 28px; font-weight: bold; color: #f1c40f; display: none; z-index: 2100; text-shadow: 2px 2px 4px #000; white-space: pre-wrap; }
     </style>
 </head>
@@ -62,7 +58,6 @@
     </div>
 
     <div id="keyboard">
-        <!-- 4x4 Grid Layout -->
         <div class="key base-key" data-base="あ"><div class="main-char">あ</div><div class="sub-chars">い う え お</div></div>
         <div class="key base-key" data-base="か"><div class="main-char">か</div><div class="sub-chars">き く け こ</div></div>
         <div class="key base-key" data-base="さ"><div class="main-char">さ</div><div class="sub-chars">し す せ そ</div></div>
@@ -84,7 +79,6 @@
         <div class="key ctrl-btn" id="key-speak" data-action="speak"><div class="main-char">🗣</div><div class="sub-chars">はなす</div></div>
     </div>
 
-    <!-- フリック入力展開用オーバーレイ -->
     <div id="flick-overlay">
         <div class="flick-petal petal-c" id="petal-c"></div>
         <div class="flick-petal petal-l" id="petal-l"></div>
@@ -108,6 +102,13 @@
     <div id="calib-instruction">顔を動かして赤い丸を指してください...</div>
 
     <script>
+        // ★ 安全装置: プログラムでエラーが起きたら黒い画面に原因を表示する ★
+        window.onerror = function(message, source, lineno, colno, error) {
+            document.getElementById('status-text').innerText = "システムエラー発生";
+            document.getElementById('status-text').style.color = "#ff3b3b";
+            document.getElementById('status-sub').innerText = "行番号: " + lineno + "\n" + message;
+        };
+
         const textOutput = document.getElementById('text-output');
         const cursor = document.getElementById('cursor');
         const flickOverlay = document.getElementById('flick-overlay');
@@ -121,7 +122,6 @@
 
         let audioUnlocked = false;
 
-        // --- フリックマップの定義 ---
         const flickMap = {
             'あ': { c: 'あ', l: 'い', t: 'う', r: 'え', b: 'お' },
             'か': { c: 'か', l: 'き', t: 'く', r: 'け', b: 'こ' },
@@ -137,7 +137,6 @@
             '記': { c: '、', l: '。', t: '？', r: '！', b: '・' }
         };
 
-        // 濁点・半濁点のサイクル辞書
         const dakutenCycle = {
             'か':'が','が':'か','き':'ぎ','ぎ':'き','く':'ぐ','ぐ':'く','け':'げ','げ':'け','こ':'ご','ご':'こ',
             'さ':'ざ','ざ':'さ','し':'じ','じ':'し','す':'ず','ず':'す','せ':'ぜ','ぜ':'せ','そ':'ぞ','ぞ':'そ',
@@ -177,9 +176,7 @@
         }
 
         function triggerInput(char) {
-            if(char && char !== '小') {
-                textOutput.value += char;
-            }
+            if(char && char !== '小') { textOutput.value += char; }
         }
 
         let gameState = 'loading'; 
@@ -193,7 +190,6 @@
         let calibData = { center: {x:0, y:0}, top: {x:0, y:0}, bottom: {x:0, y:0}, left: {x:0, y:0}, right: {x:0, y:0} };
         let calibBuffer = [];
         
-        // ★ バグ修正：プログラムの改行は \n を使い、実際のコード上では1行にする ★
         const practiceSteps = [
             { id: 'practice_center', x: 50, y: 50, msg: "【練習 1/5】\n中央の的を見て、\n「口をあけて、とじる」と決定します" },
             { id: 'practice_top', x: 50, y: 20, msg: "【練習 2/5】\n画面「上」の的を見て、\n口で決定してください" },
@@ -215,7 +211,6 @@
             speechSynthesis.speak(new SpeechSynthesisUtterance('')); audioUnlocked = true;
             statusOverlay.style.background = 'rgba(0,0,0,0.5)';
             statusText.style.display = 'none'; statusSub.style.display = 'none'; startBtn.style.display = 'none';
-            // 改行を \n に修正
             runCalibrationStep('center', 50, 50, '顔を動かして、\n画面【中央】の赤い丸に鼻先を向けてください');
         });
 
@@ -231,7 +226,6 @@
                     let avgX = 0, avgY = 0;
                     if(calibBuffer.length > 0) { calibBuffer.forEach(d => { avgX += d.x; avgY += d.y; }); calibData[step] = { x: avgX / calibBuffer.length, y: avgY / calibBuffer.length }; }
                     
-                    // 改行を \n に修正
                     if(step === 'center') runCalibrationStep('top', 50, 10, '顔を上に向けて、\n画面【上端】の赤い丸に鼻先を向けてください');
                     else if(step === 'top') runCalibrationStep('bottom', 50, 90, '顔を下に向けて、\n画面【下端】の赤い丸に鼻先を向けてください');
                     else if(step === 'bottom') runCalibrationStep('left', 10, 50, '顔を左に向けて、\n画面【左端】の赤い丸に鼻先を向けてください');
@@ -290,9 +284,9 @@
 
         function onResults(results) {
             if (gameState === 'loading') {
-                gameState = 'ready'; statusText.innerText = "準備完了";
-                // 改行を \n に修正
-                statusSub.innerText = "鼻先の動きでカーソルを操作し、「口をあけて、とじる」と決定します。\n音声の準備をするため、下のボタンを押してください。";
+                gameState = 'ready'; 
+                document.getElementById('status-text').innerText = "準備完了";
+                document.getElementById('status-sub').innerText = "鼻先の動きでカーソルを操作し、「口をあけて、とじる」と決定します。\n音声の準備をするため、下のボタンを押してください。";
                 startBtn.style.display = 'block';
             }
 
@@ -395,8 +389,16 @@
         faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         faceMesh.onResults(onResults);
 
-        const camera = new Camera(video, { onFrame: async () => { await faceMesh.send({image: video}); }, width: 640, height: 480 });
-        camera.start().catch(err => alert("カメラの起動に失敗しました。"));
+        try {
+            const camera = new Camera(video, { onFrame: async () => { await faceMesh.send({image: video}); }, width: 640, height: 480 });
+            camera.start().catch(err => {
+                document.getElementById('status-text').innerText = "カメラ起動エラー";
+                document.getElementById('status-sub').innerText = "カメラのアクセスが許可されていないか、他のアプリが使用中です。";
+            });
+        } catch(e) {
+            document.getElementById('status-text').innerText = "システムエラー";
+            document.getElementById('status-sub').innerText = e.toString();
+        }
     </script>
 </body>
 </html>
