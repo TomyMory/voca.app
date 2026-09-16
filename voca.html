@@ -3,25 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>視線・顔フリック文字盤ツール</title>
+    <title>視線・顔フリック文字盤ツール (予測変換搭載)</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
     <style>
         body { margin: 0; background-color: #2c3e50; color: #ecf0f1; font-family: sans-serif; overflow: hidden; user-select: none; }
         
-        #top-bar { height: 20vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background-color: #1a252f; padding: 10px; box-sizing: border-box; border-bottom: 4px solid #34495e; }
-        #text-output { width: 90%; height: 60px; font-size: 40px; text-align: center; border-radius: 10px; border: none; padding: 10px; margin-bottom: 10px; background-color: #ecf0f1; color: #2c3e50; font-weight: bold; pointer-events: none; }
+        #top-bar { height: 25vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background-color: #1a252f; padding: 10px; box-sizing: border-box; border-bottom: 4px solid #34495e; }
+        
+        /* テキスト表示エリア（確定文字と入力中文字を分ける） */
+        .text-display { width: 90%; height: 60px; font-size: 38px; text-align: center; border-radius: 10px; background-color: #ecf0f1; color: #2c3e50; font-weight: bold; padding: 10px; margin-bottom: 8px; display: flex; justify-content: center; align-items: center; white-space: nowrap; overflow: hidden; }
+        #current-input { color: #e74c3c; border-bottom: 4px solid #e74c3c; margin-left: 2px; }
+
+        /* 予測変換候補エリア */
+        #suggestion-bar { width: 90%; height: 50px; display: flex; gap: 10px; justify-content: center; margin-bottom: 10px; }
+        .suggest-btn { flex: 1; max-width: 180px; background-color: #f39c12; color: white; font-size: 22px; font-weight: bold; border-radius: 8px; border: none; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.1s; cursor: pointer; overflow: hidden; white-space: nowrap; padding: 0 10px; }
         
         .controls { display: flex; gap: 20px; width: 90%; justify-content: center; }
         
-        #keyboard { height: 80vh; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: 10px; padding: 15px; box-sizing: border-box; }
+        #keyboard { height: 75vh; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: 10px; padding: 15px; box-sizing: border-box; }
         
         .key { background-color: #34495e; color: white; border-radius: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; transition: all 0.1s ease-out; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .key .main-char { font-size: 45px; pointer-events: none; }
         .key .sub-chars { font-size: 16px; color: #95a5a6; margin-top: 5px; pointer-events: none; }
         
         .ctrl-btn { background-color: #7f8c8d; border-radius: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; transition: all 0.1s ease-out; cursor: pointer; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .top-ctrl-btn { flex: 1; max-width: 200px; padding: 10px; font-size: 20px; border: none; }
+        .top-ctrl-btn { flex: 1; max-width: 200px; padding: 8px; font-size: 18px; border: none; border-radius: 8px; }
         .ctrl-btn .main-char { font-size: 30px; pointer-events: none; }
         .ctrl-btn .sub-chars { font-size: 14px; color: #ecf0f1; margin-top: 5px; pointer-events: none; }
 
@@ -29,12 +36,12 @@
         #key-undo { background-color: #3498db; }
         #key-speak { background-color: #27ae60; }
         #key-mod { background-color: #8e44ad; }
-        
         .btn-red { background-color: #e74c3c !important; }
 
-        .key.hovered, .ctrl-btn.hovered, #practice-target.hovered { background-color: #f1c40f !important; color: #2c3e50 !important; transform: scale(1.05); box-shadow: 0 8px 15px rgba(241, 196, 15, 0.4) !important; }
-        .key.ready, .ctrl-btn.ready { background-color: #3498db !important; color: white !important; transform: scale(1.1) !important; box-shadow: 0 0 20px #3498db !important; border: 2px solid #fff; }
-        .key.blink, .ctrl-btn.blink { background-color: #2ecc71 !important; color: white !important; transform: scale(1.15) !important; box-shadow: 0 0 25px #2ecc71 !important; transition: 0s !important; }
+        /* ホバー＆決定アクションの視覚効果 */
+        .key.hovered, .ctrl-btn.hovered, .suggest-btn.hovered, #practice-target.hovered { background-color: #f1c40f !important; color: #2c3e50 !important; transform: scale(1.05); box-shadow: 0 8px 15px rgba(241, 196, 15, 0.4) !important; }
+        .key.ready, .ctrl-btn.ready, .suggest-btn.ready, #practice-target.ready { background-color: #3498db !important; color: white !important; transform: scale(1.1) !important; box-shadow: 0 0 20px #3498db !important; border: 2px solid #fff; }
+        .key.blink, .ctrl-btn.blink, .suggest-btn.blink, #practice-target.blink { background-color: #2ecc71 !important; color: white !important; transform: scale(1.15) !important; box-shadow: 0 0 25px #2ecc71 !important; transition: 0s !important; }
 
         video { display: none; }
         
@@ -56,18 +63,25 @@
 
         #calib-target { position: absolute; width: 40px; height: 40px; background-color: #e74c3c; border: 4px solid white; border-radius: 50%; transform: translate(-50%, -50%); display: none; z-index: 2100; box-shadow: 0 0 15px #e74c3c; transition: all 0.1s; }
         #practice-target { position: absolute; width: 160px; height: 160px; background-color: #e67e22; border: 4px solid white; border-radius: 20px; transform: translate(-50%, -50%); display: none; z-index: 2100; box-shadow: 0 0 20px rgba(230,126,34,0.8); flex-direction: column; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; text-align: center; color: white; transition: all 0.1s ease-out; cursor: pointer; }
-        #practice-target.ready { transform: translate(-50%, -50%) scale(1.1) !important; background-color: #3498db !important; box-shadow: 0 0 20px #3498db !important; border: 4px solid #fff; }
-        #practice-target.blink { transform: translate(-50%, -50%) scale(1.15) !important; background-color: #2ecc71 !important; box-shadow: 0 0 30px #2ecc71 !important; transition: 0s !important; }
-        
         #calib-instruction { position: absolute; top: 10%; width: 100%; text-align: center; font-size: 28px; font-weight: bold; color: #f1c40f; display: none; z-index: 2100; text-shadow: 2px 2px 4px #000; white-space: pre-wrap; }
+        
+        #cursor { position: absolute; top: 50%; left: 50%; width: 30px; height: 30px; background-color: rgba(231, 76, 60, 0.8); border: 3px solid white; border-radius: 50%; transform: translate(-50%, -50%); z-index: 2500; pointer-events: none; transition: width 0.1s, height 0.1s; box-shadow: 0 0 10px rgba(0,0,0,0.5); display: none; }
+        #cursor.ready { background-color: #3498db; width: 45px; height: 45px; border: 4px solid #fff; }
+        #cursor.blink { background-color: #2ecc71; width: 60px; height: 60px; }
     </style>
 </head>
 <body>
 
     <div id="top-bar">
-        <input type="text" id="text-output" readonly placeholder="フリック入力モード">
+        <!-- 確定文字と入力中文字を分ける -->
+        <div class="text-display">
+            <span id="confirmed-text"></span><span id="current-input"></span>
+        </div>
+        
+        <!-- 予測変換の候補ボタンが並ぶエリア -->
+        <div id="suggestion-bar"></div>
+
         <div class="controls">
-            <!-- 誤爆しにくいトップバーに配置 -->
             <button class="ctrl-btn top-ctrl-btn btn-red" data-action="clear">✖ 全部消す</button>
         </div>
     </div>
@@ -81,8 +95,6 @@
         <div class="key base-key" data-base="た"><div class="main-char">た</div><div class="sub-chars">ち つ て と</div></div>
         <div class="key base-key" data-base="な"><div class="main-char">な</div><div class="sub-chars">に ぬ ね の</div></div>
         <div class="key base-key" data-base="は"><div class="main-char">は</div><div class="sub-chars">ひ ふ へ ほ</div></div>
-        
-        <!-- 全部消す を 1つ戻す(Undo) に変更 -->
         <div class="key ctrl-btn" id="key-undo" data-action="undo"><div class="main-char">↩</div><div class="sub-chars">1つ戻す</div></div>
         
         <div class="key base-key" data-base="ま"><div class="main-char">ま</div><div class="sub-chars">み む め も</div></div>
@@ -103,6 +115,8 @@
         <div class="flick-petal petal-r" id="petal-r"></div>
         <div class="flick-petal petal-b" id="petal-b"></div>
     </div>
+
+    <div id="cursor"></div>
 
     <video id="webcam" autoplay playsinline muted></video>
     <div id="warning-msg">顔がカメラから離れすぎています。<br>もう少し近づいてください。</div>
@@ -128,28 +142,97 @@
             }
         };
 
-        const textOutput = document.getElementById('text-output');
+        const confirmedTextEl = document.getElementById('confirmed-text');
+        const currentInputEl = document.getElementById('current-input');
+        const suggestionBar = document.getElementById('suggestion-bar');
+        const cursor = document.getElementById('cursor');
         const flickOverlay = document.getElementById('flick-overlay');
         const statusOverlay = document.getElementById('status-overlay');
         const startBtn = document.getElementById('start-btn');
         const warningMsg = document.getElementById('warning-msg');
         
-        const calibTarget = document.getElementById('calib-target');
-        const practiceTarget = document.getElementById('practice-target');
-        const calibInstruction = document.getElementById('calib-instruction');
-
         let audioUnlocked = false;
 
-        // ★ 履歴保存機能（Undo用）★
+        // 文字入力の管理変数
+        let confirmedText = "";
+        let currentInput = "";
         let textHistory = [];
-        
+
         function saveHistory() {
-            textHistory.push(textOutput.value);
-            // メモリ節約のため履歴は直近20回まで
-            if (textHistory.length > 20) {
-                textHistory.shift();
-            }
+            textHistory.push({ c: confirmedText, i: currentInput });
+            if (textHistory.length > 20) textHistory.shift();
         }
+
+        function updateTextDisplay() {
+            confirmedTextEl.innerText = confirmedText;
+            currentInputEl.innerText = currentInput;
+        }
+
+        // --- ★ 予測変換システム（ハイブリッド型） ★ ---
+        // 1. VOCA専用ローカル辞書（よく使う言葉を優先表示）
+        const localDict = [
+            "ありがとう", "おはよう", "こんにちは", "こんばんは", "さようなら", "おねがいします", "おつかれさま",
+            "いきたい", "たべたい", "のみたい", "かえりたい", "たすけて", "きてください", 
+            "トイレ", "いたい", "くるしい", "あつい", "さむい", "かゆい", "ねむい", "はい", "いいえ", "ごめんなさい"
+        ];
+
+        function fetchSuggestions() {
+            if (!currentInput) {
+                renderSuggestions([]);
+                return;
+            }
+
+            // まずローカル辞書から検索
+            let candidates = localDict.filter(word => word.startsWith(currentInput) && word !== currentInput);
+
+            // Google API（JSONP）を呼び出して漢字変換候補を取得
+            const script = document.createElement('script');
+            script.src = `https://www.google.com/transliterate?langpair=ja-Hira|ja&text=${encodeURIComponent(currentInput)}&jsonp=googleSuggestCallback`;
+            script.onload = () => script.remove();
+            script.onerror = () => script.remove();
+            document.body.appendChild(script);
+
+            // APIが返ってくるまでの繋ぎとしてローカル候補を表示
+            renderSuggestions(candidates.slice(0, 4));
+            window.tempLocalCandidates = candidates;
+        }
+
+        // Google APIからデータが返ってきた時の処理
+        window.googleSuggestCallback = function(data) {
+            let candidates = window.tempLocalCandidates || [];
+            if (data && data[0] && data[0][1]) {
+                const apiCands = data[0][1];
+                apiCands.forEach(c => {
+                    if (!candidates.includes(c) && c !== currentInput) candidates.push(c);
+                });
+            }
+            // 画面に収まるように上位4つを表示
+            renderSuggestions(candidates.slice(0, 4));
+        };
+
+        // 候補ボタンを生成して表示する
+        function renderSuggestions(list) {
+            suggestionBar.innerHTML = '';
+            list.forEach(word => {
+                const btn = document.createElement('div');
+                btn.className = 'suggest-btn';
+                btn.innerText = word;
+                btn.dataset.text = word;
+                
+                // マウス・タップ用
+                btn.addEventListener('click', () => triggerSuggestion(word));
+                suggestionBar.appendChild(btn);
+            });
+        }
+
+        function triggerSuggestion(word) {
+            saveHistory();
+            confirmedText += word;
+            currentInput = "";
+            updateTextDisplay();
+            renderSuggestions([]); // 候補を消す
+        }
+        // ---------------------------------------------
 
         const flickMap = {
             'あ': { c: 'あ', l: 'い', t: 'う', r: 'え', b: 'お' },
@@ -177,13 +260,22 @@
         };
 
         function speakText() {
-            let text = textOutput.value;
+            let text = confirmedText + currentInput;
             if (text === "") return;
             const ttsMap = { "こんにちは": "こんにちわ。", "ありがとう": "ありがとう。", "おはよう": "おはようございます。", "さようなら": "さようなら。" };
             if (ttsMap[text]) text = ttsMap[text];
             else text = text + "。"; 
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'ja-JP'; utterance.rate = 1.0; speechSynthesis.speak(utterance);
+            
+            // 喋ったら未確定文字を確定させる
+            if (currentInput) {
+                saveHistory();
+                confirmedText += currentInput;
+                currentInput = "";
+                updateTextDisplay();
+                renderSuggestions([]);
+            }
         }
 
         function triggerAction(element) {
@@ -194,16 +286,28 @@
 
             if (action === 'undo') {
                 if (textHistory.length > 0) {
-                    textOutput.value = textHistory.pop();
+                    const state = textHistory.pop();
+                    confirmedText = state.c;
+                    currentInput = state.i;
+                    updateTextDisplay();
+                    fetchSuggestions();
                 }
             }
             else if (action === 'dakuten') {
-                const text = textOutput.value;
-                if(text.length > 0) {
-                    const lastChar = text.slice(-1);
+                if (currentInput.length > 0) {
+                    const lastChar = currentInput.slice(-1);
                     if(dakutenCycle[lastChar]) {
-                        saveHistory(); // 文字が変わる前に履歴保存
-                        textOutput.value = text.slice(0, -1) + dakutenCycle[lastChar];
+                        saveHistory(); 
+                        currentInput = currentInput.slice(0, -1) + dakutenCycle[lastChar];
+                        updateTextDisplay();
+                        fetchSuggestions();
+                    }
+                } else if (confirmedText.length > 0) {
+                    const lastChar = confirmedText.slice(-1);
+                    if(dakutenCycle[lastChar]) {
+                        saveHistory(); 
+                        confirmedText = confirmedText.slice(0, -1) + dakutenCycle[lastChar];
+                        updateTextDisplay();
                     }
                 }
             } 
@@ -211,28 +315,36 @@
                 speakText();
             }
             else if (action === 'delete') {
-                if(textOutput.value.length > 0) {
-                    saveHistory(); // 履歴保存
-                    textOutput.value = textOutput.value.slice(0, -1);
+                saveHistory();
+                if (currentInput.length > 0) {
+                    currentInput = currentInput.slice(0, -1);
+                    fetchSuggestions();
+                } else if (confirmedText.length > 0) {
+                    confirmedText = confirmedText.slice(0, -1);
                 }
+                updateTextDisplay();
             }
             else if (action === 'clear') {
-                if(textOutput.value.length > 0) {
-                    saveHistory(); // 全消し前にもしっかり保存！
-                    textOutput.value = "";
+                if(confirmedText.length > 0 || currentInput.length > 0) {
+                    saveHistory(); 
+                    confirmedText = "";
+                    currentInput = "";
+                    updateTextDisplay();
+                    renderSuggestions([]);
                 }
             }
         }
 
         function triggerInput(char) {
             if(char && char !== '小') { 
-                saveHistory(); // 文字を入力する前に履歴保存
-                textOutput.value += char; 
+                saveHistory(); 
+                currentInput += char;
+                updateTextDisplay();
+                fetchSuggestions(); // 入力するたびに予測変換を呼ぶ
             }
         }
 
         let gameState = 'loading'; 
-        
         let cursorX = window.innerWidth / 2;
         let cursorY = window.innerHeight / 2;
         
@@ -248,7 +360,7 @@
         let calibBuffer = [];
         
         const practiceSteps = [
-            { id: 'practice_center', x: 50, y: 50, msg: "【練習 1/5】\n光っている的を見て、\n「口をあけて、とじる」と決定します" },
+            { id: 'practice_center', x: 50, y: 50, msg: "【練習 1/5】\n赤いカーソルを的に合わせて、\n「口をあけて、とじる」と決定します" },
             { id: 'practice_top', x: 50, y: 30, msg: "【練習 2/5】\n上の的を見て、口で決定" },
             { id: 'practice_bottom', x: 50, y: 80, msg: "【練習 3/5】\n下の的を見て、口で決定" },
             { id: 'practice_left', x: 20, y: 50, msg: "【練習 4/5】\n左の的を見て、口で決定" },
@@ -298,13 +410,18 @@
         }
 
         function startPracticePhase() {
-            currentPracticeIndex = 0; showPracticeTarget();
+            currentPracticeIndex = 0;
+            cursor.style.display = 'block'; // 練習中はカーソル表示
+            showPracticeTarget();
         }
 
         function showPracticeTarget() {
             if (currentPracticeIndex >= practiceSteps.length) {
                 practiceTarget.style.display = 'none'; calibInstruction.style.display = 'none';
-                statusOverlay.style.display = 'none'; gameState = 'playing'; return;
+                statusOverlay.style.display = 'none'; 
+                gameState = 'playing'; 
+                cursor.style.display = 'none'; // 本番はカーソル非表示
+                return;
             }
             const step = practiceSteps[currentPracticeIndex]; gameState = step.id;
             practiceTarget.style.display = 'flex'; practiceTarget.style.left = `${step.x}%`; practiceTarget.style.top = `${step.y}%`;
@@ -384,9 +501,13 @@
                     targetX = Math.max(0, Math.min(window.innerWidth, targetX));
                     targetY = Math.max(0, Math.min(window.innerHeight, targetY));
 
-                    // ★ 追従スピードのアップ (0.2 -> 0.45) ★
                     cursorX += (targetX - cursorX) * 0.45; 
                     cursorY += (targetY - cursorY) * 0.45;
+
+                    if (gameState.startsWith('practice_')) {
+                        cursor.style.left = `${cursorX}px`;
+                        cursor.style.top = `${cursorY}px`;
+                    }
 
                     if (activeFlickBase) {
                         const dx = cursorX - flickStartX;
@@ -412,7 +533,8 @@
                     } 
                     else {
                         const elementUnderCursor = document.elementFromPoint(cursorX, cursorY);
-                        const isFocusable = elementUnderCursor && (elementUnderCursor.classList.contains('key') || elementUnderCursor.classList.contains('ctrl-btn') || elementUnderCursor.id === 'practice-target');
+                        // ★ 予測変換ボタン (.suggest-btn) もハイライトと選択の対象に追加 ★
+                        const isFocusable = elementUnderCursor && (elementUnderCursor.classList.contains('key') || elementUnderCursor.classList.contains('ctrl-btn') || elementUnderCursor.classList.contains('suggest-btn') || elementUnderCursor.id === 'practice-target');
 
                         if (hoveredElement && hoveredElement !== elementUnderCursor) {
                             hoveredElement.classList.remove('hovered', 'ready');
@@ -435,6 +557,7 @@
                     if (mouthRatio > MOUTH_OPEN_THRESH) {
                         if (!isMouthOpen) {
                             isMouthOpen = true;
+                            if (gameState.startsWith('practice_')) cursor.classList.add('ready');
                             if (hoveredElement) hoveredElement.classList.add('ready');
                             
                             if (gameState === 'playing' && hoveredElement && hoveredElement.classList.contains('base-key')) {
@@ -444,11 +567,17 @@
                     } 
                     else if (isMouthOpen && mouthRatio < MOUTH_CLOSE_THRESH) {
                         isMouthOpen = false;
+                        if (gameState.startsWith('practice_')) cursor.classList.remove('ready');
                         
                         const now = Date.now();
                         if (now - lastClickTime > 600) { 
                             lastClickTime = now;
                             
+                            if (gameState.startsWith('practice_')) {
+                                cursor.classList.add('blink');
+                                setTimeout(() => cursor.classList.remove('blink'), 200);
+                            }
+
                             let targetToBlink = activeFlickBase ? document.getElementById(`petal-${currentFlickSelection}`) : hoveredElement;
 
                             if (targetToBlink) {
@@ -465,7 +594,12 @@
                             else if (hoveredElement) {
                                 if (gameState.startsWith('practice_') && hoveredElement.id === 'practice-target') {
                                     advancePractice();
-                                } else if (gameState === 'playing' && hoveredElement.classList.contains('ctrl-btn')) {
+                                } 
+                                // ★ 予測変換ボタンの決定アクション ★
+                                else if (gameState === 'playing' && hoveredElement.classList.contains('suggest-btn')) {
+                                    triggerSuggestion(hoveredElement.dataset.text);
+                                }
+                                else if (gameState === 'playing' && hoveredElement.classList.contains('ctrl-btn')) {
                                     triggerAction(hoveredElement);
                                 }
                             }
@@ -473,6 +607,7 @@
                     } 
                     else if (!isMouthOpen && hoveredElement && !activeFlickBase) {
                         hoveredElement.classList.remove('ready');
+                        if (gameState.startsWith('practice_')) cursor.classList.remove('ready');
                     }
                 }
             } else {
@@ -480,17 +615,21 @@
             }
         }
 
-        document.querySelectorAll('.key, .ctrl-btn, .flick-petal, .top-ctrl-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                if(btn.classList.contains('flick-petal')) {
-                    triggerInput(btn.dataset.char);
-                    hideFlickMenu();
-                } else if(btn.classList.contains('base-key')) {
-                    triggerInput(flickMap[btn.dataset.base].c);
-                } else {
-                    triggerAction(btn);
-                }
-            });
+        // マウスクリック用
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.key, .ctrl-btn, .flick-petal, .top-ctrl-btn, .suggest-btn');
+            if (!btn) return;
+
+            if(btn.classList.contains('flick-petal')) {
+                triggerInput(btn.dataset.char);
+                hideFlickMenu();
+            } else if(btn.classList.contains('base-key')) {
+                triggerInput(flickMap[btn.dataset.base].c);
+            } else if(btn.classList.contains('suggest-btn')) {
+                triggerSuggestion(btn.dataset.text);
+            } else {
+                triggerAction(btn);
+            }
         });
 
         const video = document.getElementById('webcam');
