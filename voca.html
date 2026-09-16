@@ -58,6 +58,7 @@
     </div>
 
     <div id="keyboard">
+        <!-- 4x4 Grid Layout -->
         <div class="key base-key" data-base="あ"><div class="main-char">あ</div><div class="sub-chars">い う え お</div></div>
         <div class="key base-key" data-base="か"><div class="main-char">か</div><div class="sub-chars">き く け こ</div></div>
         <div class="key base-key" data-base="さ"><div class="main-char">さ</div><div class="sub-chars">し す せ そ</div></div>
@@ -79,6 +80,7 @@
         <div class="key ctrl-btn" id="key-speak" data-action="speak"><div class="main-char">🗣</div><div class="sub-chars">はなす</div></div>
     </div>
 
+    <!-- フリック入力展開用オーバーレイ -->
     <div id="flick-overlay">
         <div class="flick-petal petal-c" id="petal-c"></div>
         <div class="flick-petal petal-l" id="petal-l"></div>
@@ -102,11 +104,15 @@
     <div id="calib-instruction">顔を動かして赤い丸を指してください...</div>
 
     <script>
-        // ★ 安全装置: プログラムでエラーが起きたら黒い画面に原因を表示する ★
+        // エラー検知の安全装置
         window.onerror = function(message, source, lineno, colno, error) {
-            document.getElementById('status-text').innerText = "システムエラー発生";
-            document.getElementById('status-text').style.color = "#ff3b3b";
-            document.getElementById('status-sub').innerText = "行番号: " + lineno + "\n" + message;
+            const statusText = document.getElementById('status-text');
+            const statusSub = document.getElementById('status-sub');
+            if(statusText && statusSub) {
+                statusText.innerText = "システムエラー発生";
+                statusText.style.color = "#ff3b3b";
+                statusSub.innerText = "行番号: " + lineno + "\n" + message;
+            }
         };
 
         const textOutput = document.getElementById('text-output');
@@ -210,7 +216,12 @@
         startBtn.addEventListener('click', () => {
             speechSynthesis.speak(new SpeechSynthesisUtterance('')); audioUnlocked = true;
             statusOverlay.style.background = 'rgba(0,0,0,0.5)';
-            statusText.style.display = 'none'; statusSub.style.display = 'none'; startBtn.style.display = 'none';
+            
+            // ★ 前回のバグ修正箇所：安全にIDから取得して非表示にする ★
+            document.getElementById('status-text').style.display = 'none'; 
+            document.getElementById('status-sub').style.display = 'none'; 
+            startBtn.style.display = 'none';
+            
             runCalibrationStep('center', 50, 50, '顔を動かして、\n画面【中央】の赤い丸に鼻先を向けてください');
         });
 
