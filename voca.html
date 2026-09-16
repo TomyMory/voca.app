@@ -17,7 +17,7 @@
         .key .main-char { font-size: 45px; pointer-events: none; }
         .key .sub-chars { font-size: 16px; color: #95a5a6; margin-top: 5px; pointer-events: none; }
         
-        /* ホバー時のアニメーション（的が動かないように修正） */
+        /* ホバー時のアニメーション */
         .key.hovered, .ctrl-btn.hovered, #practice-target.hovered { background-color: #f1c40f !important; color: #2c3e50 !important; transform: scale(1.05); }
         #practice-target.hovered { transform: translate(-50%, -50%) scale(1.1) !important; }
 
@@ -60,7 +60,7 @@
     </div>
 
     <div id="keyboard">
-        <!-- 4x4 Grid Layout (スマホ風の配列) -->
+        <!-- 4x4 Grid Layout -->
         <div class="key base-key" data-base="あ"><div class="main-char">あ</div><div class="sub-chars">い う え お</div></div>
         <div class="key base-key" data-base="か"><div class="main-char">か</div><div class="sub-chars">き く け こ</div></div>
         <div class="key base-key" data-base="さ"><div class="main-char">さ</div><div class="sub-chars">し す せ そ</div></div>
@@ -191,7 +191,7 @@
         let calibData = { center: {x:0, y:0}, top: {x:0, y:0}, bottom: {x:0, y:0}, left: {x:0, y:0}, right: {x:0, y:0} };
         let calibBuffer = [];
         
-        // 練習フェーズのステップ定義
+        // 練習フェーズのステップ定義（※改行コードのバグを修正済み）
         const practiceSteps = [
             { id: 'practice_center', x: 50, y: 50, msg: "【練習 1/5】\n中央の的を見て、\n「口をあけて、とじる」と決定します" },
             { id: 'practice_top', x: 50, y: 20, msg: "【練習 2/5】\n画面「上」の的を見て、\n口で決定してください" },
@@ -273,6 +273,7 @@
                 const petalElem = document.getElementById(`petal-${p}`);
                 petalElem.innerText = map[p];
                 petalElem.dataset.char = map[p];
+                // '小' など入力不要な文字は薄くする
                 if(map[p] === '小') { petalElem.style.opacity = '0.5'; } else { petalElem.style.opacity = '1'; }
             });
             flickOverlay.style.display = 'block';
@@ -287,7 +288,6 @@
             }
         }
 
-        // --- メインループ ---
         function onResults(results) {
             if (gameState === 'loading') {
                 gameState = 'ready'; statusText.innerText = "準備完了";
@@ -316,7 +316,7 @@
                     cursorX += (targetX - cursorX) * 0.2; cursorY += (targetY - cursorY) * 0.2;
                     cursor.style.left = `${cursorX}px`; cursor.style.top = `${cursorY}px`;
 
-                    // ハイライト判定
+                    // ハイライト判定 (flickメニューが出ている時はpetalを優先)
                     const elementUnderCursor = document.elementFromPoint(cursorX, cursorY);
                     if (hoveredElement && hoveredElement !== elementUnderCursor) {
                         hoveredElement.classList.remove('hovered');
@@ -328,13 +328,12 @@
                         hoveredElement = null;
                     }
 
-                    // 口の開閉判定 (決定アクション)
+                    // 口の開閉判定
                     const upperLip = landmarks[13]; const lowerLip = landmarks[14];
                     const mouthRatio = Math.hypot(upperLip.x - lowerLip.x, upperLip.y - lowerLip.y) / faceHeight;
                     const MOUTH_OPEN_THRESH = 0.055; 
                     const MOUTH_CLOSE_THRESH = 0.025;
 
-                    // 1. 口を開けた！
                     if (mouthRatio > MOUTH_OPEN_THRESH) {
                         if (!isMouthOpen) {
                             isMouthOpen = true;
@@ -345,13 +344,12 @@
                             }
                         }
                     } 
-                    // 2. 口を閉じた！（＝クリック）
                     else if (isMouthOpen && mouthRatio < MOUTH_CLOSE_THRESH) {
                         isMouthOpen = false;
                         cursor.classList.remove('ready');
 
                         const now = Date.now();
-                        if (now - lastClickTime > 600) { // 連打防止
+                        if (now - lastClickTime > 600) { // 連打防止 0.6秒
                             lastClickTime = now;
                             cursor.classList.add('blink');
                             setTimeout(() => cursor.classList.remove('blink'), 200);
@@ -384,13 +382,14 @@
             }
         }
 
-        // マウスや指でのタップサポート
+        // マウスや指でのタップもサポート
         document.querySelectorAll('.key, .ctrl-btn, .flick-petal').forEach(btn => {
             btn.addEventListener('click', () => {
                 if(btn.classList.contains('flick-petal')) {
                     triggerInput(btn.dataset.char);
                     hideFlickMenu();
                 } else if(btn.classList.contains('base-key')) {
+                    // タップ時はセンターキーを入力
                     triggerInput(flickMap[btn.dataset.base].c);
                 } else {
                     triggerAction(btn);
