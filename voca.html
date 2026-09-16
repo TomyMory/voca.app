@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>視線・顔文字盤ツール</title>
-    <!-- MediaPipe Face Mesh -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
     <style>
@@ -29,14 +28,11 @@
 
         video { display: none; }
         
-        /* 状態表示・キャリブレーション画面 */
         #status-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; text-align: center; }
         #start-btn { padding: 15px 30px; font-size: 24px; background-color: #3498db; color: white; border: none; border-radius: 10px; cursor: pointer; margin-top: 20px; display: none; }
         
-        /* 距離警告 */
         #warning-msg { position: absolute; top: 40%; width: 100%; text-align: center; color: #ff3b3b; font-size: 32px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 20px 0; display: none; z-index: 300; }
 
-        /* キャリブレーションのターゲット（的） */
         #calib-target { position: absolute; width: 40px; height: 40px; background-color: #e74c3c; border: 4px solid white; border-radius: 50%; transform: translate(-50%, -50%); display: none; z-index: 210; box-shadow: 0 0 15px #e74c3c; }
         #calib-instruction { position: absolute; bottom: 20%; width: 100%; text-align: center; font-size: 28px; font-weight: bold; color: #f1c40f; display: none; z-index: 210; }
     </style>
@@ -64,7 +60,6 @@
         <button id="start-btn">調整（キャリブレーション）を開始</button>
     </div>
 
-    <!-- キャリブレーション用の的 -->
     <div id="calib-target"></div>
     <div id="calib-instruction">赤い丸を見つめてください...</div>
 
@@ -81,10 +76,8 @@
         const calibTarget = document.getElementById('calib-target');
         const calibInstruction = document.getElementById('calib-instruction');
 
-        // 音声合成のロック解除フラグ
         let audioUnlocked = false;
 
-        // 五十音表生成
         const kanaMap = [
             "あ","い","う","え","お", "か","き","く","け","こ",
             "さ","し","す","せ","そ", "た","ち","つ","て","と",
@@ -99,13 +92,11 @@
             div.innerText = char;
             if(char !== "（" && char !== "）") {
                 div.dataset.char = char;
-                // ★ PCのマウス/タップ操作用イベント ★
                 div.onclick = () => triggerAction(div);
             }
             keyboardDiv.appendChild(div);
         });
 
-        // 音声合成
         function speakText() {
             const text = textOutput.value;
             if (text === "") return;
@@ -115,11 +106,9 @@
             speechSynthesis.speak(utterance);
         }
 
-        // 入力・操作アクション
         function triggerAction(element) {
             if (!element) return;
             
-            // ユーザー操作があれば音声をアンロック（保険）
             if(!audioUnlocked) {
                 speechSynthesis.speak(new SpeechSynthesisUtterance(''));
                 audioUnlocked = true;
@@ -137,8 +126,7 @@
             }
         }
 
-        // --- 視線・瞬き用の変数 ---
-        let gameState = 'loading'; // loading, ready, calib_center, calib_top, calib_bottom, calib_left, calib_right, playing
+        let gameState = 'loading'; 
         
         let cursorX = window.innerWidth / 2;
         let cursorY = window.innerHeight / 2;
@@ -146,14 +134,15 @@
         let lastBlinkTime = 0;
         let hoveredElement = null;
 
-        // キャリブレーションの保存データ (虹彩の相対位置を保存)
         let calibData = {
             center: {x:0, y:0}, top: {x:0, y:0}, bottom: {x:0, y:0}, left: {x:0, y:0}, right: {x:0, y:0}
         };
-        // 記録用の一時配列
         let calibBuffer = [];
+        
+        // ★ 震え防止用：直近15フレームの視線位置を記憶する配列 ★
+        const SMOOTHING_FRAMES = 15;
+        let gazeHistory = [];
 
-        // EAR（まばたき判定）計算
         function calculateEAR(landmarks, eyeIndices) {
             const pLeft = landmarks[eyeIndices[0]]; const pRight = landmarks[eyeIndices[1]];
             const pTop = landmarks[eyeIndices[2]]; const pBottom = landmarks[eyeIndices[3]];
@@ -162,38 +151,34 @@
             return vDist / hDist;
         }
 
-        // 虹彩の相対位置（視線）を取得
         function getGazeRatio(landmarks) {
-            // 左目を使用 (33:目尻, 133:目頭, 159:上まぶた, 145:下まぶた, 468:虹彩中心)
-            // 右目を使用 (362:目頭, 263:目尻, 386:上まぶた, 374:下まぶた, 473:虹彩中心)
-            // 安定させるため左目と右目の平均を取る
-            
             function getEyeRatio(inner, outer, top, bottom, iris) {
                 const eyeWidth = Math.hypot(inner.x - outer.x, inner.y - outer.y);
                 const eyeHeight = Math.hypot(bottom.x - top.x, bottom.y - top.y);
-                
-                // 虹彩が目の幅のどの位置にいるか (0.0〜1.0)
-                // カメラの鏡面反射を考慮してX軸は内側から外側への割合
                 const hRatio = Math.abs(iris.x - outer.x) / eyeWidth;
                 const vRatio = Math.abs(iris.y - top.y) / eyeHeight;
                 return { x: hRatio, y: vRatio };
             }
-
             const leftRatio = getEyeRatio(landmarks[133], landmarks[33], landmarks[159], landmarks[145], landmarks[468]);
             const rightRatio = getEyeRatio(landmarks[362], landmarks[263], landmarks[386], landmarks[374], landmarks[473]);
-            
-            return {
-                x: (leftRatio.x + rightRatio.x) / 2,
-                y: (leftRatio.y + rightRatio.y) / 2
-            };
+            return { x: (leftRatio.x + rightRatio.x) / 2, y: (leftRatio.y + rightRatio.y) / 2 };
         }
 
-        // --- キャリブレーションの進行管理 ---
+        // ★ 暴走ストッパー：キャリブレーション結果を画面座標に安全に変換する関数 ★
+        function mapRange(value, inMin, inMax, outMin, outMax) {
+            const range = inMax - inMin;
+            // 目の動きが小さすぎて差分がほとんどない場合は中央に固定する
+            if (Math.abs(range) < 0.003) return (outMin + outMax) / 2; 
+            
+            let ratio = (value - inMin) / range;
+            // 画面の端から外に飛び出さないように制限 (少しだけ遊びを持たせる)
+            ratio = Math.max(-0.1, Math.min(1.1, ratio));
+            return outMin + (outMax - outMin) * ratio;
+        }
+
         startBtn.addEventListener('click', () => {
-            // ★ ブラウザの音声ブロックを解除するための空音声再生 ★
             speechSynthesis.speak(new SpeechSynthesisUtterance(''));
             audioUnlocked = true;
-            
             statusOverlay.style.background = 'rgba(0,0,0,0.5)';
             statusText.style.display = 'none';
             statusSub.style.display = 'none';
@@ -204,7 +189,7 @@
 
         function runCalibrationStep(step, xPercent, yPercent, message) {
             gameState = `calib_${step}`;
-            calibBuffer = []; // バッファクリア
+            calibBuffer = [];
             
             calibTarget.style.display = 'block';
             calibInstruction.style.display = 'block';
@@ -212,97 +197,86 @@
             calibTarget.style.left = `${xPercent}%`;
             calibTarget.style.top = `${yPercent}%`;
 
-            // 1秒待ってから2秒間データを収集し、次のステップへ
             setTimeout(() => {
-                calibInstruction.innerText = "記録中...そのまま見つめてください";
-                
+                calibInstruction.innerText = "記録中...頭を動かさず目だけで見つめてください";
                 setTimeout(() => {
-                    // 平均値を保存
                     let avgX = 0, avgY = 0;
                     if(calibBuffer.length > 0) {
                         calibBuffer.forEach(d => { avgX += d.x; avgY += d.y; });
                         calibData[step] = { x: avgX / calibBuffer.length, y: avgY / calibBuffer.length };
                     }
                     
-                    // 次のステップへ
                     if(step === 'center') runCalibrationStep('top', 50, 10, '画面「上」の赤い丸を見つめてください');
                     else if(step === 'top') runCalibrationStep('bottom', 50, 90, '画面「下」の赤い丸を見つめてください');
                     else if(step === 'bottom') runCalibrationStep('left', 10, 50, '画面「左」の赤い丸を見つめてください');
                     else if(step === 'left') runCalibrationStep('right', 90, 50, '画面「右」の赤い丸を見つめてください');
                     else if(step === 'right') {
-                        // 完了！
                         calibTarget.style.display = 'none';
                         calibInstruction.style.display = 'none';
                         statusOverlay.style.display = 'none';
                         cursor.style.display = 'block';
                         gameState = 'playing';
+                        gazeHistory = []; // ヒストリーをリセット
                     }
-                }, 2000); // 2秒記録
-            }, 1000); // 1秒準備
+                }, 2000);
+            }, 1000);
         }
-
 
         function onResults(results) {
             if (gameState === 'loading') {
                 gameState = 'ready';
                 statusText.innerText = "準備完了";
-                statusSub.innerText = "音声の準備をするため、下のボタンを押してください。";
+                statusSub.innerText = "顔を動かさず「目だけ」で操作するモードです。\n音声の準備をするため、下のボタンを押してください。";
                 startBtn.style.display = 'block';
             }
 
             if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
                 const landmarks = results.multiFaceLandmarks[0];
 
-                // --- 1. 距離の判定（顔の横幅 234番と454番）---
                 const faceWidth = Math.abs(landmarks[234].x - landmarks[454].x);
-                if (faceWidth < 0.20) { // 遠すぎる場合
+                if (faceWidth < 0.20) { 
                     warningMsg.style.display = 'block';
-                    return; // 遠い場合はカーソル処理を停止
+                    return; 
                 } else {
                     warningMsg.style.display = 'none';
                 }
 
-                // 虹彩の相対位置を取得
                 const gaze = getGazeRatio(landmarks);
 
                 if (gameState.startsWith('calib_')) {
-                    // 記録中ならデータを保存
                     if (calibInstruction.innerText.includes("記録中")) {
                         calibBuffer.push(gaze);
                     }
                 } 
                 else if (gameState === 'playing') {
-                    // --- 2. 虹彩の位置を画面座標に変換（キャリブレーション使用） ---
-                    let targetX, targetY;
+                    // --- 視線マッピングと移動平均（スムージング） ---
                     
-                    // X座標の計算（中央からのズレを、左右の最大幅で割る）
-                    const dx = gaze.x - calibData.center.x;
-                    const rangeX = calibData.right.x - calibData.left.x; 
-                    // 鏡面なので符号が逆になる場合があるため絶対値で幅を確保
-                    const safeRangeX = Math.max(0.01, Math.abs(rangeX));
-                    
-                    // 中央(0.5)から、画面の80%分(0.8)を使って移動させる
-                    targetX = window.innerWidth * (0.5 + (dx / safeRangeX) * 0.8);
+                    // キャリブレーションの左右（10%と90%の位置）を基準に変換
+                    let tx = mapRange(gaze.x, calibData.left.x, calibData.right.x, 0.1, 0.9);
+                    let ty = mapRange(gaze.y, calibData.top.y, calibData.bottom.y, 0.1, 0.9);
 
-                    // Y座標の計算
-                    const dy = gaze.y - calibData.center.y;
-                    const rangeY = calibData.bottom.y - calibData.top.y;
-                    const safeRangeY = Math.max(0.01, Math.abs(rangeY));
-                    
-                    targetY = window.innerHeight * (0.5 + (dy / safeRangeY) * 0.8);
+                    // 履歴に追加して、古いものを捨てる
+                    gazeHistory.push({x: tx, y: ty});
+                    if (gazeHistory.length > SMOOTHING_FRAMES) gazeHistory.shift();
 
-                    // 画面外に出ないように制限
-                    targetX = Math.max(20, Math.min(window.innerWidth - 20, targetX));
-                    targetY = Math.max(20, Math.min(window.innerHeight - 20, targetY));
+                    // 履歴の平均値を出すことで、ブルブル震えるノイズを吸収する
+                    let avgTx = 0, avgTy = 0;
+                    gazeHistory.forEach(g => { avgTx += g.x; avgTy += g.y; });
+                    avgTx /= gazeHistory.length;
+                    avgTy /= gazeHistory.length;
 
-                    // 視線はブレやすいので、強めのローパスフィルタ(0.1)で滑らかにする
-                    cursorX += (targetX - cursorX) * 0.1;
-                    cursorY += (targetY - cursorY) * 0.1;
+                    // 画面のピクセル座標に変換
+                    let targetX = window.innerWidth * avgTx;
+                    let targetY = window.innerHeight * avgTy;
+
+                    // さらにローパスフィルタで滑らかに動かす
+                    cursorX += (targetX - cursorX) * 0.15;
+                    cursorY += (targetY - cursorY) * 0.15;
 
                     cursor.style.left = `${cursorX}px`;
                     cursor.style.top = `${cursorY}px`;
 
-                    // --- 3. ハイライト処理 ---
+                    // --- ハイライト処理 ---
                     const elementUnderCursor = document.elementFromPoint(cursorX, cursorY);
                     if (hoveredElement && hoveredElement !== elementUnderCursor) {
                         hoveredElement.classList.remove('hovered');
@@ -314,7 +288,7 @@
                         hoveredElement = null;
                     }
 
-                    // --- 4. まばたき検知 ---
+                    // --- まばたき検知 ---
                     const leftEyeIndices = [33, 133, 159, 145];
                     const rightEyeIndices = [362, 263, 386, 374];
                     const avgEAR = (calculateEAR(landmarks, leftEyeIndices) + calculateEAR(landmarks, rightEyeIndices)) / 2;
@@ -322,7 +296,8 @@
                     const BLINK_THRESHOLD = 0.15; 
                     const now = Date.now();
 
-                    if (avgEAR < BLINK_THRESHOLD && !isBlinking && (now - lastBlinkTime > 1200)) { // 連打防止1.2秒
+                    // まばたき連打防止（1.2秒）
+                    if (avgEAR < BLINK_THRESHOLD && !isBlinking && (now - lastBlinkTime > 1200)) { 
                         isBlinking = true;
                         lastBlinkTime = now;
 
@@ -338,7 +313,6 @@
                     }
                 }
             } else {
-                // 顔が認識されていない時
                 warningMsg.innerText = "顔が認識されていません。";
                 warningMsg.style.display = 'block';
             }
@@ -350,7 +324,7 @@
         }});
         faceMesh.setOptions({
             maxNumFaces: 1,
-            refineLandmarks: true, // 虹彩トラッキングに必須
+            refineLandmarks: true, 
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5
         });
