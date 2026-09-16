@@ -50,6 +50,8 @@
 
         #calib-target { position: absolute; width: 40px; height: 40px; background-color: #e74c3c; border: 4px solid white; border-radius: 50%; transform: translate(-50%, -50%); display: none; z-index: 2100; box-shadow: 0 0 15px #e74c3c; }
         #practice-target { position: absolute; width: 160px; height: 160px; background-color: #e67e22; border: 4px solid white; border-radius: 20px; transform: translate(-50%, -50%); display: none; z-index: 2100; box-shadow: 0 0 20px rgba(230,126,34,0.8); flex-direction: column; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; text-align: center; color: white; transition: 0.2s; }
+        
+        /* white-space: pre-wrap を指定して \n で改行されるようにする */
         #calib-instruction { position: absolute; bottom: 15%; width: 100%; text-align: center; font-size: 28px; font-weight: bold; color: #f1c40f; display: none; z-index: 2100; text-shadow: 2px 2px 4px #000; white-space: pre-wrap; }
     </style>
 </head>
@@ -175,7 +177,7 @@
         }
 
         function triggerInput(char) {
-            if(char && char !== '小') { // '小'自体の入力は無視する（フリック専用とする）
+            if(char && char !== '小') {
                 textOutput.value += char;
             }
         }
@@ -191,7 +193,7 @@
         let calibData = { center: {x:0, y:0}, top: {x:0, y:0}, bottom: {x:0, y:0}, left: {x:0, y:0}, right: {x:0, y:0} };
         let calibBuffer = [];
         
-        // 練習フェーズのステップ定義（※改行コードのバグを修正済み）
+        // ★ バグ修正：プログラムの改行は \n を使い、実際のコード上では1行にする ★
         const practiceSteps = [
             { id: 'practice_center', x: 50, y: 50, msg: "【練習 1/5】\n中央の的を見て、\n「口をあけて、とじる」と決定します" },
             { id: 'practice_top', x: 50, y: 20, msg: "【練習 2/5】\n画面「上」の的を見て、\n口で決定してください" },
@@ -213,10 +215,10 @@
             speechSynthesis.speak(new SpeechSynthesisUtterance('')); audioUnlocked = true;
             statusOverlay.style.background = 'rgba(0,0,0,0.5)';
             statusText.style.display = 'none'; statusSub.style.display = 'none'; startBtn.style.display = 'none';
+            // 改行を \n に修正
             runCalibrationStep('center', 50, 50, '顔を動かして、\n画面【中央】の赤い丸に鼻先を向けてください');
         });
 
-        // 1. 顔の向きのキャリブレーション
         function runCalibrationStep(step, xPercent, yPercent, message) {
             gameState = `calib_${step}`; calibBuffer = [];
             calibTarget.style.display = 'block'; calibInstruction.style.display = 'block';
@@ -229,6 +231,7 @@
                     let avgX = 0, avgY = 0;
                     if(calibBuffer.length > 0) { calibBuffer.forEach(d => { avgX += d.x; avgY += d.y; }); calibData[step] = { x: avgX / calibBuffer.length, y: avgY / calibBuffer.length }; }
                     
+                    // 改行を \n に修正
                     if(step === 'center') runCalibrationStep('top', 50, 10, '顔を上に向けて、\n画面【上端】の赤い丸に鼻先を向けてください');
                     else if(step === 'top') runCalibrationStep('bottom', 50, 90, '顔を下に向けて、\n画面【下端】の赤い丸に鼻先を向けてください');
                     else if(step === 'bottom') runCalibrationStep('left', 10, 50, '顔を左に向けて、\n画面【左端】の赤い丸に鼻先を向けてください');
@@ -241,7 +244,6 @@
             }, 1000); 
         }
 
-        // 2. 口の開閉・クリック練習フェーズ
         function startPracticePhase() {
             currentPracticeIndex = 0; cursor.style.display = 'block'; showPracticeTarget();
         }
@@ -260,7 +262,6 @@
             currentPracticeIndex++; showPracticeTarget();
         }
 
-        // --- フリックメニュー制御 ---
         function showFlickMenu(baseChar, keyElement) {
             activeFlickBase = baseChar;
             const rect = keyElement.getBoundingClientRect();
@@ -273,7 +274,6 @@
                 const petalElem = document.getElementById(`petal-${p}`);
                 petalElem.innerText = map[p];
                 petalElem.dataset.char = map[p];
-                // '小' など入力不要な文字は薄くする
                 if(map[p] === '小') { petalElem.style.opacity = '0.5'; } else { petalElem.style.opacity = '1'; }
             });
             flickOverlay.style.display = 'block';
@@ -291,6 +291,7 @@
         function onResults(results) {
             if (gameState === 'loading') {
                 gameState = 'ready'; statusText.innerText = "準備完了";
+                // 改行を \n に修正
                 statusSub.innerText = "鼻先の動きでカーソルを操作し、「口をあけて、とじる」と決定します。\n音声の準備をするため、下のボタンを押してください。";
                 startBtn.style.display = 'block';
             }
@@ -310,13 +311,11 @@
                     if (calibInstruction.innerText.includes("記録中")) calibBuffer.push({ x: nose.x, y: nose.y });
                 } 
                 else if (gameState.startsWith('practice_') || gameState === 'playing') {
-                    // カーソル移動
                     let targetX = mapRange(nose.x, calibData.left.x, calibData.right.x, window.innerWidth * 0.1, window.innerWidth * 0.9);
                     let targetY = mapRange(nose.y, calibData.top.y, calibData.bottom.y, window.innerHeight * 0.1, window.innerHeight * 0.9);
                     cursorX += (targetX - cursorX) * 0.2; cursorY += (targetY - cursorY) * 0.2;
                     cursor.style.left = `${cursorX}px`; cursor.style.top = `${cursorY}px`;
 
-                    // ハイライト判定 (flickメニューが出ている時はpetalを優先)
                     const elementUnderCursor = document.elementFromPoint(cursorX, cursorY);
                     if (hoveredElement && hoveredElement !== elementUnderCursor) {
                         hoveredElement.classList.remove('hovered');
@@ -328,7 +327,6 @@
                         hoveredElement = null;
                     }
 
-                    // 口の開閉判定
                     const upperLip = landmarks[13]; const lowerLip = landmarks[14];
                     const mouthRatio = Math.hypot(upperLip.x - lowerLip.x, upperLip.y - lowerLip.y) / faceHeight;
                     const MOUTH_OPEN_THRESH = 0.055; 
@@ -338,7 +336,6 @@
                         if (!isMouthOpen) {
                             isMouthOpen = true;
                             cursor.classList.add('ready');
-                            // フリックメニューの展開
                             if (gameState === 'playing' && hoveredElement && hoveredElement.classList.contains('base-key')) {
                                 showFlickMenu(hoveredElement.dataset.base, hoveredElement);
                             }
@@ -349,13 +346,12 @@
                         cursor.classList.remove('ready');
 
                         const now = Date.now();
-                        if (now - lastClickTime > 600) { // 連打防止 0.6秒
+                        if (now - lastClickTime > 600) { 
                             lastClickTime = now;
                             cursor.classList.add('blink');
                             setTimeout(() => cursor.classList.remove('blink'), 200);
 
                             if (activeFlickBase) {
-                                // フリック決定
                                 let charToInput = flickMap[activeFlickBase].c;
                                 if (hoveredElement && hoveredElement.classList.contains('flick-petal')) {
                                     charToInput = hoveredElement.dataset.char;
@@ -364,7 +360,6 @@
                                 hideFlickMenu();
                             } 
                             else if (hoveredElement) {
-                                // 通常ボタンの決定
                                 if (gameState.startsWith('practice_') && hoveredElement.id === 'practice-target') {
                                     advancePractice();
                                 } else if (gameState === 'playing' && hoveredElement.classList.contains('ctrl-btn')) {
@@ -382,14 +377,12 @@
             }
         }
 
-        // マウスや指でのタップもサポート
         document.querySelectorAll('.key, .ctrl-btn, .flick-petal').forEach(btn => {
             btn.addEventListener('click', () => {
                 if(btn.classList.contains('flick-petal')) {
                     triggerInput(btn.dataset.char);
                     hideFlickMenu();
                 } else if(btn.classList.contains('base-key')) {
-                    // タップ時はセンターキーを入力
                     triggerInput(flickMap[btn.dataset.base].c);
                 } else {
                     triggerAction(btn);
