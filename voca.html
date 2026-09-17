@@ -11,9 +11,9 @@
         
         :root { --flick-size: 80px; --flick-spread: 90px; }
 
-        /* --- トップバー領域 --- */
-        #top-bar { height: 22vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background-color: #1a252f; padding: 5px 10px; box-sizing: border-box; border-bottom: 4px solid #34495e; gap: 5px; }
-        .top-row { display: flex; width: 100%; height: 60%; gap: 6px; justify-content: space-between; }
+        /* --- トップバー領域（高さを少し広げてメーターを配置） --- */
+        #top-bar { height: 26vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background-color: #1a252f; padding: 5px 10px; box-sizing: border-box; border-bottom: 4px solid #34495e; gap: 5px; }
+        .top-row { display: flex; width: 100%; height: 50%; gap: 6px; justify-content: space-between; }
         
         .text-display { flex: 1; height: 100%; font-size: clamp(16px, 5vw, 28px); text-align: left; border-radius: 8px; background-color: #ecf0f1; color: #2c3e50; font-weight: bold; padding: 5px 10px; box-sizing: border-box; display: block; white-space: pre-wrap; word-break: break-all; overflow-y: auto; line-height: 1.2; margin: 0; }
         #current-input { color: #e74c3c; border-bottom: 4px solid #e74c3c; margin-left: 2px; }
@@ -24,11 +24,22 @@
         #btn-reset-center { background-color: #9b59b6; }
         #btn-clear-all { background-color: #e74c3c; }
 
-        #suggestion-bar { width: 100%; height: 35%; display: flex; gap: 5px; justify-content: center; }
+        #suggestion-bar { width: 100%; height: 30%; display: flex; gap: 5px; justify-content: center; }
         .suggest-btn { flex: 1; background-color: #f39c12; color: white; font-size: clamp(12px, 3.5vw, 20px); font-weight: bold; border-radius: 6px; border: none; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.1s; cursor: pointer; overflow: hidden; white-space: nowrap; padding: 0 5px; text-overflow: ellipsis; }
         
+        /* --- ★ 新設：目の開き具合 リアルタイムメーター ★ --- */
+        #sensor-bar { width: 100%; height: 15%; display: flex; align-items: center; gap: 10px; padding: 0 5px; box-sizing: border-box; }
+        #sensor-gauge { flex: 1; height: 100%; max-height: 16px; background: #34495e; border-radius: 8px; position: relative; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
+        #sensor-fill { height: 100%; width: 0%; transition: width 0.1s linear, background-color 0.2s ease; }
+        .sensor-line { position: absolute; top: 0; bottom: 0; width: 2px; background: white; z-index: 2; box-shadow: 0 0 3px black; }
+        #sensor-text { width: clamp(130px, 35vw, 180px); font-size: clamp(11px, 3vw, 16px); font-weight: bold; color: white; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .sensor-color-open { background-color: #2ecc71 !important; } /* 緑：開いている */
+        .sensor-color-half { background-color: #f1c40f !important; } /* 黄：半目 */
+        .sensor-color-close { background-color: #e74c3c !important; } /* 赤：閉じている */
+
         /* --- キーボード領域 --- */
-        #keyboard { height: 78vh; width: 100%; max-width: 600px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(4, 1fr); gap: 4px; padding: 5px; box-sizing: border-box; }
+        #keyboard { height: 74vh; width: 100%; max-width: 600px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(4, 1fr); gap: 4px; padding: 5px; box-sizing: border-box; }
         
         .key, .ctrl-btn { border-radius: 8px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; transition: all 0.1s ease-out; box-shadow: 0 4px 6px rgba(0,0,0,0.3); cursor: pointer; }
         .key { background-color: #34495e; color: white; }
@@ -64,7 +75,7 @@
 
         @media (max-width: 600px) { :root { --flick-size: 65px; --flick-spread: 75px; } }
 
-        /* --- 全消し確認ポップアップ --- */
+        /* --- 全消し確認＆リセット --- */
         #confirm-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 4000; display: none; flex-direction: column; justify-content: center; align-items: center; }
         .confirm-box { background: #ecf0f1; border-radius: 15px; padding: 30px; text-align: center; width: 80%; max-width: 500px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         .confirm-msg { font-size: clamp(20px, 6vw, 32px); color: #2c3e50; font-weight: bold; margin-bottom: 30px; line-height: 1.4; }
@@ -73,7 +84,6 @@
         .btn-yes { background: #e74c3c; color: white; }
         .btn-no { background: #95a5a6; color: white; }
 
-        /* --- 中心リセット カウントダウン画面 --- */
         #reset-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 4500; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; }
         #reset-overlay h1 { font-size: clamp(24px, 7vw, 40px); color: #f1c40f; margin-bottom: 10px; text-align: center; }
         #reset-timer { font-size: 100px; font-weight: bold; color: #e74c3c; }
@@ -84,7 +94,9 @@
         #warning-msg { position: absolute; top: 40%; width: 100%; text-align: center; color: #ff3b3b; font-size: clamp(20px, 6vw, 32px); font-weight: bold; background: rgba(0,0,0,0.7); padding: 20px 0; display: none; z-index: 3000; }
 
         #calib-target { position: absolute; width: 40px; height: 40px; background-color: #e74c3c; border: 4px solid white; border-radius: 50%; transform: translate(-50%, -50%); display: none; z-index: 2100; box-shadow: 0 0 15px #e74c3c; transition: all 0.1s; }
-        #practice-target { position: absolute; width: clamp(100px, 30vw, 160px); height: clamp(100px, 30vw, 160px); background-color: #e67e22; border: 4px solid white; border-radius: 20px; transform: translate(-50%, -50%); display: none; z-index: 2100; box-shadow: 0 0 20px rgba(230,126,34,0.8); flex-direction: column; justify-content: center; align-items: center; font-size: clamp(16px, 5vw, 24px); font-weight: bold; text-align: center; color: white; transition: all 0.1s ease-out; }
+        
+        /* 練習の的（動的メッセージを表示するため少し修正） */
+        #practice-target { position: absolute; width: clamp(120px, 35vw, 180px); height: clamp(120px, 35vw, 180px); background-color: #e67e22; border: 4px solid white; border-radius: 20px; transform: translate(-50%, -50%); display: none; z-index: 2100; box-shadow: 0 0 20px rgba(230,126,34,0.8); flex-direction: column; justify-content: center; align-items: center; font-size: clamp(14px, 4.5vw, 22px); font-weight: bold; text-align: center; color: white; transition: all 0.1s ease-out; white-space: pre-wrap; line-height: 1.3; }
         #calib-instruction { position: absolute; top: 10%; width: 100%; text-align: center; font-size: clamp(16px, 5vw, 28px); font-weight: bold; color: #f1c40f; display: none; z-index: 2100; text-shadow: 2px 2px 4px #000; white-space: pre-wrap; pointer-events: none; }
         
         #cursor { position: absolute; width: 30px; height: 30px; background-color: rgba(231, 76, 60, 0.8); border: 3px solid white; border-radius: 50%; transform: translate(-50%, -50%); z-index: 2500; pointer-events: none; display: none; }
@@ -97,16 +109,24 @@
             <div class="text-display">
                 <span id="confirmed-text"></span><span id="current-input"></span>
             </div>
-            
             <div id="btn-reset-center" class="top-btn hit-target top-hit" data-action="reset_center">
                 <div class="main-char">🎯</div><div class="sub-chars">位置ﾘｾｯﾄ</div>
             </div>
-
             <div id="btn-clear-all" class="top-btn hit-target top-hit" data-action="clear">
                 <div class="main-char">✖</div><div class="sub-chars">全消し</div>
             </div>
         </div>
         <div id="suggestion-bar"></div>
+        
+        <!-- ★ 新設：センサーメーター ★ -->
+        <div id="sensor-bar">
+            <div id="sensor-gauge">
+                <div id="sensor-fill" class="sensor-color-open"></div>
+                <div id="line-close" class="sensor-line" style="left: 50%;"></div>
+                <div id="line-open" class="sensor-line" style="left: 70%;"></div>
+            </div>
+            <div id="sensor-text">センサー待機中...</div>
+        </div>
     </div>
 
     <!-- 5列×4段 スマホ風レイアウト -->
@@ -136,7 +156,6 @@
         <div class="ctrl-btn hit-target" data-action="undo"><div class="main-char">↩</div><div class="sub-chars">1つ戻る</div></div>
     </div>
 
-    <!-- フリック入力展開用オーバーレイ -->
     <div id="flick-overlay">
         <div class="flick-petal hit-target petal-c" data-pid="c" id="petal-c"></div>
         <div class="flick-petal hit-target petal-l" data-pid="l" id="petal-l"></div>
@@ -145,7 +164,7 @@
         <div class="flick-petal hit-target petal-b" data-pid="b" id="petal-b"></div>
     </div>
 
-    <!-- 全消し確認用ポップアップ -->
+    <!-- ポップアップ類 -->
     <div id="confirm-overlay">
         <div class="confirm-box">
             <div class="confirm-msg">全て消しても<br>良いですか？</div>
@@ -156,7 +175,6 @@
         </div>
     </div>
 
-    <!-- 中心リセット用カウントダウン画面 -->
     <div id="reset-overlay">
         <h1>画面中央の「な」を<br>見つめてください</h1>
         <div id="reset-timer">3</div>
@@ -204,13 +222,15 @@
         let textHistory = [];
         let currentMode = 'hiragana';
 
-        window.latestNoseX = 0;
-        window.latestNoseY = 0;
-
+        window.latestNoseX = 0; window.latestNoseY = 0;
+        
+        // 誤爆防止・アドバイス表示用のグローバルタイマー
+        window.eyeJustFailedTimer = 0;
+        
         // 操作用の目と閾値
         window.activeEye = 'left'; 
-        window.eyeOpenBase = 0.25;
-        window.eyeClosedBase = 0.05;
+        window.eyeOpenBase = 0;   // キャリブレーション前は未設定
+        window.eyeClosedBase = 0;
 
         function saveHistory() {
             textHistory.push({ c: confirmedText, i: currentInput });
@@ -438,9 +458,8 @@
             saveHistory(); currentInput += char; updateTextDisplay(); fetchSuggestions();
         }
 
-        // --- ★ NEW: カメラのアスペクト比(歪み)を補正した高精度な目の開き計算 ★ ---
+        // --- 目の歪み補正計算 ---
         function getEyeEAR(landmarks, type) {
-            // MediaPipeはX座標とY座標でスケールが違う(画面幅の割合)ため、4:3の補正をかけて真の距離を出す
             const aspectX = 1.333; 
             function distCorrected(p1, p2) {
                 const dx = (p1.x - p2.x) * aspectX;
@@ -448,13 +467,11 @@
                 return Math.hypot(dx, dy); 
             }
             if (type === 'left') {
-                // 画像左側（ユーザーの右目）
                 const h1 = distCorrected(landmarks[160], landmarks[144]);
                 const h2 = distCorrected(landmarks[158], landmarks[153]);
                 const w  = distCorrected(landmarks[33], landmarks[133]);
                 return (h1 + h2) / (2.0 * (w || 0.001));
             } else {
-                // 画像右側（ユーザーの左目）
                 const h1 = distCorrected(landmarks[385], landmarks[380]);
                 const h2 = distCorrected(landmarks[387], landmarks[373]);
                 const w  = distCorrected(landmarks[362], landmarks[263]);
@@ -496,7 +513,6 @@
             statusOverlay.style.background = 'rgba(0,0,0,0.5)';
             document.getElementById('status-text').style.display = 'none'; document.getElementById('status-sub').style.display = 'none'; 
             startBtn.style.display = 'none';
-            // 全7ステップ
             runCalibrationStep('center', 50, 50, '【1/7】顔を動かして、\n画面【中央】の赤い丸に鼻先を向けてください', 1200);
         });
 
@@ -538,7 +554,8 @@
                     else if(step === 'bottom') runCalibrationStep('left', 20, 50, '【4/7】顔を左に向けて、\n画面【左部】の赤い丸に鼻先を向けてください', 1200);
                     else if(step === 'left') runCalibrationStep('right', 80, 50, '【5/7】顔を右に向けて、\n画面【右部】の赤い丸に鼻先を向けてください', 1200);
                     else if(step === 'right') runCalibrationStep('eye_open', 50, 50, '【6/7】リラックスして普通に\n目を開いたまま画面を見てください', 3000);
-                    else if(step === 'eye_open') runCalibrationStep('eye_closed', 50, 50, '【7/7】決定に使う片目を\nギュッと閉じたままにしてください', 3000);
+                    // ギュッではなく軽く閉じるよう誘導
+                    else if(step === 'eye_open') runCalibrationStep('eye_closed', 50, 50, '【7/7】決定に使う片目を\n「軽く」閉じたままにしてください', 3000);
                     else if(step === 'eye_closed') { 
                         
                         let openL = calibData.eye_open.ear_l;
@@ -610,6 +627,81 @@
 
         function hideFlickMenu() { activeFlickBase = null; flickOverlay.style.display = 'none'; }
 
+        // --- ★ NEW: センサーメーターの更新関数 ★ ---
+        function updateSensorDisplay(earRatio) {
+            const fill = document.getElementById('sensor-fill');
+            const text = document.getElementById('sensor-text');
+
+            if (gameState.startsWith('calib_') || !window.eyeOpenBase) {
+                // キャリブレーション中は生データのおおよその割合を表示
+                let pct = Math.max(0, Math.min(100, (earRatio / 0.35) * 100)); 
+                fill.style.width = `${pct}%`;
+                fill.className = 'sensor-color-open';
+                text.innerText = `準備中: ${(earRatio).toFixed(3)}`;
+                return;
+            }
+
+            let earRange = window.eyeOpenBase - window.eyeClosedBase;
+            if (earRange < 0.02) earRange = 0.02;
+            
+            let normalizedEAR = (earRatio - window.eyeClosedBase) / earRange;
+            let percent = Math.round(normalizedEAR * 100);
+            let displayPct = Math.max(0, Math.min(100, percent));
+            
+            fill.style.width = `${displayPct}%`;
+
+            // 動的な判定ライン（フリック中は少し甘くなる）
+            let THRESH_CLOSE = activeFlickBase ? 65 : 50;
+            let THRESH_OPEN = 70;
+            
+            document.getElementById('line-close').style.left = `${THRESH_CLOSE}%`;
+            
+            if (window.eyeJustFailedTimer > Date.now()) {
+                text.innerText = `❌もっとゆっくり閉じて！`;
+                text.style.color = '#ff9ff3';
+            }
+            else if (percent < THRESH_CLOSE) {
+                fill.className = 'sensor-color-close';
+                text.innerText = `閉: ${displayPct}% (開くと決定)`;
+                text.style.color = '#ffcccc';
+            } else if (percent < THRESH_OPEN) {
+                fill.className = 'sensor-color-half';
+                if (isEyeClosed) {
+                    text.innerText = `半目: もっと開いて！`;
+                } else {
+                    text.innerText = `半目: もっと閉じて！`;
+                }
+                text.style.color = '#f1c40f';
+            } else {
+                fill.className = 'sensor-color-open';
+                text.innerText = `開: ${displayPct}% (待機中)`;
+                text.style.color = '#ecf0f1';
+            }
+
+            // 練習フェーズの的への動的メッセージ反映
+            if (gameState.startsWith('practice_')) {
+                const pt = document.getElementById('practice-target');
+                let msg = "ここを見て\n目を閉じる";
+                
+                if (window.eyeJustFailedTimer > Date.now()) {
+                    msg += "\n\n❌ゆっくり\n閉じて！";
+                } else if (isEyeClosed) {
+                    if (percent > THRESH_OPEN) {
+                        msg = "決定！";
+                    } else if (percent > THRESH_CLOSE) {
+                        msg = "もっとパチッと\n開いて！";
+                    } else {
+                        msg = "そのまま\n開いて決定！";
+                    }
+                } else {
+                    if (percent <= THRESH_OPEN && percent > THRESH_CLOSE) {
+                        msg += "\n\n⚠️半目です\nもっとギュッと!";
+                    }
+                }
+                pt.innerText = msg;
+            }
+        }
+
         function onResults(results) {
             if (gameState === 'loading') {
                 gameState = 'ready'; 
@@ -633,6 +725,8 @@
                             ear_r: getEyeEAR(landmarks, 'right')
                         });
                     }
+                    // キャリブレーション中もメーターを動かすために数値を渡す
+                    updateSensorDisplay(getEyeEAR(landmarks, 'left'));
                 } 
                 else if (gameState.startsWith('practice_') || gameState === 'playing' || gameState === 'confirm_clear') {
                     
@@ -669,7 +763,7 @@
                         });
                     }
                     else if (gameState === 'playing' && !activeFlickBase) {
-                        if (smoothRatioY < 0.22) {
+                        if (smoothRatioY < 0.26) { // トップバー領域拡張に対応
                             const topTargets = Array.from(document.querySelectorAll('#top-bar .hit-target'));
                             let minDist = Infinity;
                             topTargets.forEach(el => {
@@ -681,7 +775,7 @@
                             });
                         } 
                         else {
-                            let kbRatioY = (smoothRatioY - 0.22) / 0.78;
+                            let kbRatioY = (smoothRatioY - 0.26) / 0.74;
                             let col = Math.floor(smoothRatioX * 5);
                             let row = Math.floor(kbRatioY * 4);
                             col = Math.max(0, Math.min(4, col)); row = Math.max(0, Math.min(3, row));
@@ -723,33 +817,25 @@
                         hoveredElement = null;
                     }
 
-                    // --- ★ NEW: パーセンテージ（相対的）による正確な目の開閉判定 ★ ---
+                    // --- ★ EARの計算とメーターの更新 ★ ---
                     const eyeOpenBase = window.eyeOpenBase || 0.25;
                     const eyeClosedBase = window.eyeClosedBase || 0.05;
-                    
                     let earRange = eyeOpenBase - eyeClosedBase;
-                    if (earRange < 0.02) earRange = 0.02; // ゼロ除算等のエラー防止
+                    if (earRange < 0.02) earRange = 0.02;
                     
                     const eyeRatio = getEyeEAR(landmarks, window.activeEye || 'left');
-                    
-                    // 現在の目の開き具合を 0.0 (閉) 〜 1.0 (開) のパーセントに変換
-                    let normalizedEAR = (eyeRatio - eyeClosedBase) / earRange;
+                    updateSensorDisplay(eyeRatio); // ★ メーターをリアルタイム更新
 
-                    // 平常時の 50% 以下まで細めたら「閉じた」と判定
-                    let THRESH_CLOSE = 0.50; 
-                    // 70% まで戻ったら「開いた（決定）」と判定
-                    let THRESH_OPEN = 0.70;
+                    let normalizedEAR = (eyeRatio - eyeClosedBase) / earRange;
                     
-                    // フリック展開中（下を向いたりしている時）は、目が 65% まで開いてしまっても「閉じたまま」と優しく判定する
-                    if (activeFlickBase) {
-                        THRESH_CLOSE = 0.65;
-                    }
+                    let THRESH_CLOSE = 0.50; 
+                    let THRESH_OPEN = 0.70;
+                    if (activeFlickBase) { THRESH_CLOSE = 0.65; } // フリック中は甘め
 
                     if (normalizedEAR < THRESH_CLOSE) {
                         eyeClosedFrames++;
                         eyeOpenFrames = 0; 
                         
-                        // 2フレーム連続で 50% 以下ならウインク発動
                         if (eyeClosedFrames >= 2 && !isEyeClosed) {
                             isEyeClosed = true;
                             if (gameState.startsWith('practice_')) cursor.classList.add('ready');
@@ -761,10 +847,14 @@
                         }
                     } 
                     else if (normalizedEAR > THRESH_OPEN) {
+                        // ★ エラー検知：1フレームしか閉じていなかったら「速すぎる」と判定 ★
+                        if (eyeClosedFrames === 1 && !isEyeClosed) {
+                            window.eyeJustFailedTimer = Date.now() + 1500; // 1.5秒間警告
+                        }
+
                         eyeClosedFrames = 0;
                         if (isEyeClosed) {
                             eyeOpenFrames++;
-                            // 1フレームでも 70% まで戻ったら即座に決定！（最速レスポンス）
                             if (eyeOpenFrames >= 1) {
                                 isEyeClosed = false;
                                 eyeOpenFrames = 0;
@@ -804,12 +894,11 @@
                             }
                         }
                     } else {
-                        // 中間領域（遊び）
                         if (!isEyeClosed) eyeClosedFrames = 0;
                     }
                 }
             } else {
-                // 顔未認識時のエラー非表示
+                // 顔未認識時
             }
         }
 
