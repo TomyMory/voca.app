@@ -433,10 +433,25 @@
             saveHistory(); currentInput += char; updateTextDisplay(); fetchSuggestions();
         }
 
+        // --- ★ 右目の縦横比（EAR）を計算する関数 ★ ---
+        function getRightEyeEAR(landmarks) {
+            // ユーザー自身の右目（画面向かって左側の目）のランドマークインデックス
+            const top = landmarks[159];
+            const bot = landmarks[145];
+            const inC = landmarks[133];
+            const outC = landmarks[33];
+            
+            const eyeWidth = Math.hypot(inC.x - outC.x, inC.y - outC.y);
+            const eyeHeight = Math.hypot(top.x - bot.x, top.y - bot.y);
+            
+            // 幅が0などのエラー回避
+            if (eyeWidth < 0.001) return 0.2; 
+            return eyeHeight / eyeWidth;
+        }
+
         let gameState = 'loading'; 
         let smoothRatioX = 0.5; let smoothRatioY = 0.5;
         
-        // ★ 目の開閉判定用の変数 ★
         let isEyeClosed = false; 
         let lastClickTime = 0; let hoveredElement = null;
         let activeFlickBase = null; let flickStartRatioX = 0; let flickStartRatioY = 0; let currentFlickSelection = 'c';
@@ -468,7 +483,8 @@
             statusOverlay.style.background = 'rgba(0,0,0,0.5)';
             document.getElementById('status-text').style.display = 'none'; document.getElementById('status-sub').style.display = 'none'; 
             startBtn.style.display = 'none';
-            runCalibrationStep('center', 50, 50, '【1/5】顔を動かして、\n画面【中央】の赤い丸に鼻先を向けてください');
+            // 全7ステップに変更
+            runCalibrationStep('center', 50, 50, '【1/7】顔を動かして、\n画面【中央】の赤い丸に鼻先を向けてください');
         });
 
         function runCalibrationStep(step, xPercent, yPercent, message) {
@@ -478,16 +494,26 @@
             calibTarget.style.left = `${xPercent}%`; calibTarget.style.top = `${yPercent}%`;
 
             setTimeout(() => {
-                calibInstruction.innerText = "【記録中...】そのまま顔を止めてお待ちください";
+                calibInstruction.innerText = "【記録中...】そのままお待ちください";
                 setTimeout(() => {
-                    let avgX = 0, avgY = 0;
-                    if(calibBuffer.length > 0) { calibBuffer.forEach(d => { avgX += d.x; avgY += d.y; }); calibData[step] = { x: avgX / calibBuffer.length, y: avgY / calibBuffer.length }; }
+                    let avgX = 0, avgY = 0, avgEar = 0;
+                    if(calibBuffer.length > 0) { 
+                        calibBuffer.forEach(d => { avgX += d.x; avgY += d.y; avgEar += d.ear; }); 
+                        calibData[step] = { 
+                            x: avgX / calibBuffer.length, 
+                            y: avgY / calibBuffer.length,
+                            ear: avgEar / calibBuffer.length 
+                        }; 
+                    }
                     
-                    if(step === 'center') runCalibrationStep('top', 50, 20, '【2/5】顔を上に向けて、\n画面【上部】の赤い丸に鼻先を向けてください');
-                    else if(step === 'top') runCalibrationStep('bottom', 50, 80, '【3/5】顔を下に向けて、\n画面【下部】の赤い丸に鼻先を向けてください');
-                    else if(step === 'bottom') runCalibrationStep('left', 20, 50, '【4/5】顔を左に向けて、\n画面【左部】の赤い丸に鼻先を向けてください');
-                    else if(step === 'left') runCalibrationStep('right', 80, 50, '【5/5】顔を右に向けて、\n画面【右部】の赤い丸に鼻先を向けてください');
-                    else if(step === 'right') { calibTarget.style.display = 'none'; startPracticePhase(); }
+                    // ★ ステップに目のキャリブレーション（eye_open, eye_closed）を追加 ★
+                    if(step === 'center') runCalibrationStep('top', 50, 20, '【2/7】顔を上に向けて、\n画面【上部】の赤い丸に鼻先を向けてください');
+                    else if(step === 'top') runCalibrationStep('bottom', 50, 80, '【3/7】顔を下に向けて、\n画面【下部】の赤い丸に鼻先を向けてください');
+                    else if(step === 'bottom') runCalibrationStep('left', 20, 50, '【4/7】顔を左に向けて、\n画面【左部】の赤い丸に鼻先を向けてください');
+                    else if(step === 'left') runCalibrationStep('right', 80, 50, '【5/7】顔を右に向けて、\n画面【右部】の赤い丸に鼻先を向けてください');
+                    else if(step === 'right') runCalibrationStep('eye_open', 50, 50, '【6/7】リラックスして普通に\n目を開いたまま画面を見てください');
+                    else if(step === 'eye_open') runCalibrationStep('eye_closed', 50, 50, '【7/7】「右目」だけを\nギュッと閉じたままにしてください');
+                    else if(step === 'eye_closed') { calibTarget.style.display = 'none'; startPracticePhase(); }
                 }, 1200); 
             }, 800); 
         }
@@ -548,13 +574,15 @@
             if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
                 const landmarks = results.multiFaceLandmarks[0];
                 
-                // 鼻の座標
                 const nose = landmarks[1];
                 window.latestNoseX = nose.x;
                 window.latestNoseY = nose.y;
 
                 if (gameState.startsWith('calib_')) {
-                    if (calibInstruction.innerText.includes("記録中")) calibBuffer.push({ x: nose.x, y: nose.y });
+                    if (calibInstruction.innerText.includes("記録中")) {
+                        // 位置と一緒に目の開き具合（EAR）もバッファに記憶させる
+                        calibBuffer.push({ x: nose.x, y: nose.y, ear: getRightEyeEAR(landmarks) });
+                    }
                 } 
                 else if (gameState.startsWith('practice_') || gameState === 'playing' || gameState === 'confirm_clear') {
                     
@@ -645,33 +673,37 @@
                         hoveredElement = null;
                     }
 
-                    // --- ★ 右目の開閉判定（ウインク） ★ ---
-                    // ユーザーの右目（画面の左側に映る目）のランドマーク
-                    const rEyeTop = landmarks[386]; 
-                    const rEyeBot = landmarks[374];
-                    const rEyeIn = landmarks[362]; 
-                    const rEyeOut = landmarks[263];
-
-                    // 目の横幅に対する縦幅の比率を計算
-                    const eyeWidth = Math.hypot(rEyeIn.x - rEyeOut.x, rEyeIn.y - rEyeOut.y);
-                    const eyeHeight = Math.hypot(rEyeTop.x - rEyeBot.x, rEyeTop.y - rEyeBot.y);
-                    const eyeRatio = eyeHeight / eyeWidth;
+                    // --- ★ 動的閾値（パーソナルキャリブレーション）の計算 ★ ---
+                    const eyeOpenBase = calibData.eye_open ? calibData.eye_open.ear : 0.25;
+                    const eyeClosedBase = calibData.eye_closed ? calibData.eye_closed.ear : 0.05;
                     
-                    // 閾値（通常開いている時は0.25程度、閉じると0.05程度）
-                    const EYE_CLOSED_THRESH = 0.12;  
-                    const EYE_OPEN_THRESH = 0.16; 
+                    // ベース値から安全マージンを取って境界線を引く
+                    let EYE_OPEN_THRESH = eyeClosedBase + (eyeOpenBase - eyeClosedBase) * 0.6;  
+                    let EYE_CLOSED_THRESH = eyeClosedBase + (eyeOpenBase - eyeClosedBase) * 0.3;
+                    
+                    // エラー防止（目がうまく測定できなかった場合のデフォルト値）
+                    if (eyeOpenBase - eyeClosedBase < 0.02) {
+                        EYE_OPEN_THRESH = 0.16;
+                        EYE_CLOSED_THRESH = 0.12;
+                    }
+
+                    // フリック展開中（顔を斜めに向けたりする時）はウインク維持の判定を甘くする
+                    if (activeFlickBase) {
+                        EYE_CLOSED_THRESH = eyeClosedBase + (eyeOpenBase - eyeClosedBase) * 0.5;
+                    }
+
+                    const eyeRatio = getRightEyeEAR(landmarks);
 
                     if (eyeRatio < EYE_CLOSED_THRESH) {
                         eyeClosedFrames++;
                         eyeOpenFrames = 0; 
                         
-                        // 無意識のまばたきを弾くため、3フレーム連続で閉じたら「意図的なウインク」と判定
+                        // 無意識のまばたきを弾くため、3フレーム（約0.1秒）連続で閉じたら「意図的なウインク」と判定
                         if (eyeClosedFrames >= 3 && !isEyeClosed) {
                             isEyeClosed = true;
                             if (gameState.startsWith('practice_')) cursor.classList.add('ready');
                             if (hoveredElement) hoveredElement.classList.add('ready');
                             
-                            // フリックメニューの展開
                             if (gameState === 'playing' && hoveredElement && hoveredElement.dataset.base) {
                                 showFlickMenu(hoveredElement.dataset.base, hoveredElement);
                             }
@@ -681,7 +713,7 @@
                         eyeClosedFrames = 0;
                         if (isEyeClosed) {
                             eyeOpenFrames++;
-                            // 1フレームでも開いたら即座に決定（スピード最優先）
+                            // 1フレームでも開いたら即座に決定
                             if (eyeOpenFrames >= 1) {
                                 isEyeClosed = false;
                                 eyeOpenFrames = 0;
@@ -725,8 +757,7 @@
                     }
                 }
             } else {
-                // 顔が認識されていない場合は警告は出さない（邪魔にならないように）
-                // warningMsg.innerText = "顔が認識されていません。"; warningMsg.style.display = 'block';
+                // 顔が認識されていない場合は警告を出さない
             }
         }
 
