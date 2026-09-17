@@ -36,9 +36,16 @@
         #key-mod { background-color: #8e44ad; }
         .btn-red { background-color: #e74c3c !important; }
 
-        .key.hovered, .ctrl-btn.hovered, .suggest-btn.hovered, #practice-target.hovered { background-color: #f1c40f !important; color: #2c3e50 !important; transform: scale(1.05); box-shadow: 0 8px 15px rgba(241, 196, 15, 0.4) !important; }
-        .key.ready, .ctrl-btn.ready, .suggest-btn.ready, #practice-target.ready { background-color: #3498db !important; color: white !important; transform: scale(1.1) !important; box-shadow: 0 0 20px #3498db !important; border: 2px solid #fff; }
-        .key.blink, .ctrl-btn.blink, .suggest-btn.blink, #practice-target.blink { background-color: #2ecc71 !important; color: white !important; transform: scale(1.15) !important; box-shadow: 0 0 25px #2ecc71 !important; transition: 0s !important; }
+        /* キーボードボタンのアニメーション */
+        .key.hovered, .ctrl-btn.hovered, .suggest-btn.hovered { background-color: #f1c40f !important; color: #2c3e50 !important; transform: scale(1.05); box-shadow: 0 8px 15px rgba(241, 196, 15, 0.4) !important; }
+        .key.ready, .ctrl-btn.ready, .suggest-btn.ready { background-color: #3498db !important; color: white !important; transform: scale(1.1) !important; box-shadow: 0 0 20px #3498db !important; border: 2px solid #fff; }
+        .key.blink, .ctrl-btn.blink, .suggest-btn.blink { background-color: #2ecc71 !important; color: white !important; transform: scale(1.15) !important; box-shadow: 0 0 25px #2ecc71 !important; transition: 0s !important; }
+
+        /* ★ 的（練習用）のスタイル：ブレ防止のため拡大アニメーションを削除し、発光のみにする ★ */
+        #practice-target { position: absolute; width: 160px; height: 160px; background-color: #e67e22; border: 4px solid white; border-radius: 20px; transform: translate(-50%, -50%); display: none; z-index: 2100; flex-direction: column; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; text-align: center; color: white; transition: background-color 0.1s, box-shadow 0.1s; }
+        #practice-target.hovered { background-color: #f1c40f !important; color: #2c3e50 !important; box-shadow: 0 0 30px rgba(241, 196, 15, 0.8) !important; }
+        #practice-target.ready { background-color: #3498db !important; box-shadow: 0 0 30px #3498db !important; color: white !important; border: 4px solid #fff; }
+        #practice-target.blink { background-color: #2ecc71 !important; box-shadow: 0 0 40px #2ecc71 !important; transition: 0s !important; }
 
         video { display: none; }
         
@@ -59,10 +66,12 @@
         #warning-msg { position: absolute; top: 40%; width: 100%; text-align: center; color: #ff3b3b; font-size: 32px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 20px 0; display: none; z-index: 3000; }
 
         #calib-target { position: absolute; width: 40px; height: 40px; background-color: #e74c3c; border: 4px solid white; border-radius: 50%; transform: translate(-50%, -50%); display: none; z-index: 2100; box-shadow: 0 0 15px #e74c3c; transition: all 0.1s; }
-        #practice-target { position: absolute; width: 160px; height: 160px; background-color: #e67e22; border: 4px solid white; border-radius: 20px; transform: translate(-50%, -50%); display: none; z-index: 2100; box-shadow: 0 0 20px rgba(230,126,34,0.8); flex-direction: column; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; text-align: center; color: white; transition: all 0.1s ease-out; cursor: pointer; }
         #calib-instruction { position: absolute; top: 10%; width: 100%; text-align: center; font-size: 28px; font-weight: bold; color: #f1c40f; display: none; z-index: 2100; text-shadow: 2px 2px 4px #000; white-space: pre-wrap; pointer-events: none; }
         
-        /* カーソルは完全に削除し、内部の座標計算のみで処理します */
+        /* ★ 練習用カーソルスタイル ★ */
+        #cursor { position: absolute; width: 30px; height: 30px; background-color: rgba(231, 76, 60, 0.8); border: 3px solid white; border-radius: 50%; transform: translate(-50%, -50%); z-index: 2500; pointer-events: none; transition: width 0.1s, height 0.1s; box-shadow: 0 0 10px rgba(0,0,0,0.5); display: none; }
+        #cursor.ready { background-color: #3498db; width: 45px; height: 45px; border: 4px solid #fff; }
+        #cursor.blink { background-color: #2ecc71; width: 60px; height: 60px; }
     </style>
 </head>
 <body>
@@ -107,6 +116,9 @@
         <div class="flick-petal petal-b" id="petal-b"></div>
     </div>
 
+    <!-- ★ 練習用のカーソル ★ -->
+    <div id="cursor"></div>
+
     <video id="webcam" autoplay playsinline muted></video>
     <div id="warning-msg">顔がカメラから離れすぎています。<br>もう少し近づいてください。</div>
 
@@ -138,6 +150,7 @@
         const statusOverlay = document.getElementById('status-overlay');
         const startBtn = document.getElementById('start-btn');
         const warningMsg = document.getElementById('warning-msg');
+        const cursor = document.getElementById('cursor');
         
         const calibTarget = document.getElementById('calib-target');
         const practiceTarget = document.getElementById('practice-target');
@@ -283,23 +296,14 @@
         }
 
         let gameState = 'loading'; 
+        let smoothRatioX = 0.5; let smoothRatioY = 0.5;
         
-        // 内部計算用の座標（0.0 ~ 1.0 の相対値）
-        let smoothRatioX = 0.5;
-        let smoothRatioY = 0.5;
-        
-        let isMouthOpen = false;
-        let lastClickTime = 0;
-        let hoveredElement = null;
-        let activeFlickBase = null;
-        let flickStartRatioX = 0;
-        let flickStartRatioY = 0;
-        let currentFlickSelection = 'c';
+        let isMouthOpen = false; let lastClickTime = 0; let hoveredElement = null;
+        let activeFlickBase = null; let flickStartRatioX = 0; let flickStartRatioY = 0; let currentFlickSelection = 'c';
 
         let calibData = { center: {x:0, y:0}, top: {x:0, y:0}, bottom: {x:0, y:0}, left: {x:0, y:0}, right: {x:0, y:0} };
         let calibBuffer = [];
         
-        // ★ 的の座標も％（比率）で定義し、数学的距離で計算する ★
         const practiceSteps = [
             { id: 'practice_center', x: 0.5, y: 0.5, msg: "【練習 1/5】\n光っている的を見て、\n「口をあけて、とじる」と決定します" },
             { id: 'practice_top', x: 0.5, y: 0.3, msg: "【練習 2/5】\n上の的を見て、口で決定" },
@@ -313,7 +317,6 @@
             const range = inMax - inMin;
             if (Math.abs(range) < 0.01) return (outMin + outMax) / 2; 
             let ratio = (value - inMin) / range;
-            // 少しだけ範囲を拡張して四隅を押しやすくする
             ratio = Math.max(-0.2, Math.min(1.2, ratio));
             return outMin + (outMax - outMin) * ratio;
         }
@@ -358,7 +361,9 @@
             if (currentPracticeIndex >= practiceSteps.length) {
                 practiceTarget.style.display = 'none'; calibInstruction.style.display = 'none';
                 statusOverlay.style.display = 'none'; 
-                gameState = 'playing'; return;
+                gameState = 'playing'; 
+                cursor.style.display = 'none'; // 本番はカーソルを完全に消す
+                return;
             }
             const step = practiceSteps[currentPracticeIndex]; gameState = step.id;
             practiceTarget.style.display = 'flex'; practiceTarget.style.left = `${step.x * 100}%`; practiceTarget.style.top = `${step.y * 100}%`;
@@ -371,9 +376,7 @@
 
         function showFlickMenu(baseChar, keyElement) {
             activeFlickBase = baseChar;
-            // 展開時の基準座標（比率）を記録
-            flickStartRatioX = smoothRatioX;
-            flickStartRatioY = smoothRatioY;
+            flickStartRatioX = smoothRatioX; flickStartRatioY = smoothRatioY;
             currentFlickSelection = 'c';
 
             const rect = keyElement.getBoundingClientRect();
@@ -424,31 +427,38 @@
                 } 
                 else if (gameState.startsWith('practice_') || gameState === 'playing') {
                     
-                    // --- ★ グリッド・スナップ用の座標計算（0.0 ~ 1.0）★ ---
                     let targetRatioX = mapRange(nose.x, calibData.left.x, calibData.right.x, 0.0, 1.0);
                     let targetRatioY = mapRange(nose.y, calibData.top.y, calibData.bottom.y, 0.0, 1.0);
                     
-                    // 下方向の感度ブースト（下半分を見るときは移動量を増幅）
                     if (targetRatioY > 0.5) { targetRatioY = 0.5 + (targetRatioY - 0.5) * 1.5; }
                     
                     targetRatioX = Math.max(0, Math.min(1.0, targetRatioX));
                     targetRatioY = Math.max(0, Math.min(1.0, targetRatioY));
 
-                    // スムージング（ノイズ除去程度に軽くかけるだけで超高速レスポンス）
                     smoothRatioX += (targetRatioX - smoothRatioX) * 0.7; 
                     smoothRatioY += (targetRatioY - smoothRatioY) * 0.7;
 
+                    let cursorPx = smoothRatioX * window.innerWidth;
+                    let cursorPy = smoothRatioY * window.innerHeight;
+
+                    // ★ 練習中のみカーソルを表示し、座標を同期する ★
+                    if (gameState.startsWith('practice_')) {
+                        cursor.style.display = 'block';
+                        cursor.style.left = `${cursorPx}px`;
+                        cursor.style.top = `${cursorPy}px`;
+                    } else {
+                        cursor.style.display = 'none';
+                    }
+
                     let elementUnderCursor = null;
 
-                    // --- フリック展開中の判定（中心からの角度・距離で判定） ---
                     if (activeFlickBase) {
                         const dx = smoothRatioX - flickStartRatioX;
                         const dy = smoothRatioY - flickStartRatioY;
-                        const threshold = 0.15; // フリックの遊び（感度）
+                        const threshold = 0.15; 
 
-                        if (Math.hypot(dx, dy) < threshold) {
-                            currentFlickSelection = 'c';
-                        } else {
+                        if (Math.hypot(dx, dy) < threshold) { currentFlickSelection = 'c'; } 
+                        else {
                             if (Math.abs(dx) > Math.abs(dy)) { currentFlickSelection = dx < 0 ? 'l' : 'r'; } 
                             else { currentFlickSelection = dy < 0 ? 't' : 'b'; }
                         }
@@ -463,21 +473,20 @@
                             }
                         });
                     } 
-                    // --- 練習フェーズの判定（座標の数学的距離でブレを完全排除） ---
+                    // ★ 練習用の的の当たり判定（ピクセル距離で計算するため絶対にブレない） ★
                     else if (gameState.startsWith('practice_')) {
                         const step = practiceSteps[currentPracticeIndex];
-                        const dist = Math.hypot(smoothRatioX - step.x, smoothRatioY - step.y);
+                        const targetPx = step.x * window.innerWidth;
+                        const targetPy = step.y * window.innerHeight;
+                        const dist = Math.hypot(cursorPx - targetPx, cursorPy - targetPy);
                         
-                        // 距離が近ければ（0.15以内）的を見ていると判定
-                        if (dist < 0.15) {
+                        // 150ピクセル以内なら的に当たっていると判定（甘めの設定）
+                        if (dist < 150) {
                             elementUnderCursor = practiceTarget;
                         }
                     }
-                    // --- 本番キーボードの判定（4x4のグリッドで瞬時に選択） ---
                     else if (gameState === 'playing') {
-                        // 画面上部（0.0 ~ 0.25 の高さ）は予測変換やTOPボタンとみなす
                         if (smoothRatioY < 0.25) {
-                            // X座標でどの予測変換ボタンか判定する
                             const suggestions = document.querySelectorAll('.suggest-btn');
                             if (suggestions.length > 0) {
                                 const stepX = 1.0 / suggestions.length;
@@ -486,8 +495,6 @@
                                 elementUnderCursor = suggestions[btnIndex];
                             }
                         } else {
-                            // 下部（0.25 ~ 1.0）は4x4のメインキーボードエリア
-                            // 0.25〜1.0を、0.0〜1.0に再マッピングして4等分する
                             let kbRatioY = (smoothRatioY - 0.25) / 0.75;
                             let col = Math.floor(smoothRatioX * 4);
                             let row = Math.floor(kbRatioY * 4);
@@ -500,7 +507,6 @@
                         }
                     }
 
-                    // --- ハイライト状態の更新 ---
                     if (!activeFlickBase) {
                         if (hoveredElement && hoveredElement !== elementUnderCursor) {
                             hoveredElement.classList.remove('hovered', 'ready');
@@ -514,7 +520,6 @@
                         }
                     }
 
-                    // --- 口の開閉判定 ---
                     const upperLip = landmarks[13]; const lowerLip = landmarks[14];
                     const mouthRatio = Math.hypot(upperLip.x - lowerLip.x, upperLip.y - lowerLip.y) / faceHeight;
                     const MOUTH_OPEN_THRESH = 0.055; 
@@ -523,7 +528,9 @@
                     if (mouthRatio > MOUTH_OPEN_THRESH) {
                         if (!isMouthOpen) {
                             isMouthOpen = true;
+                            if (gameState.startsWith('practice_')) cursor.classList.add('ready');
                             if (hoveredElement) hoveredElement.classList.add('ready');
+                            
                             if (gameState === 'playing' && hoveredElement && hoveredElement.classList.contains('base-key')) {
                                 showFlickMenu(hoveredElement.dataset.base, hoveredElement);
                             }
@@ -531,11 +538,17 @@
                     } 
                     else if (isMouthOpen && mouthRatio < MOUTH_CLOSE_THRESH) {
                         isMouthOpen = false;
+                        if (gameState.startsWith('practice_')) cursor.classList.remove('ready');
                         
                         const now = Date.now();
                         if (now - lastClickTime > 600) { 
                             lastClickTime = now;
                             
+                            if (gameState.startsWith('practice_')) {
+                                cursor.classList.add('blink');
+                                setTimeout(() => cursor.classList.remove('blink'), 200);
+                            }
+
                             let targetToBlink = activeFlickBase ? document.getElementById(`petal-${currentFlickSelection}`) : hoveredElement;
 
                             if (targetToBlink) {
@@ -571,7 +584,6 @@
             }
         }
 
-        // マウスクリック用
         document.addEventListener('click', (e) => {
             const btn = e.target.closest('.key, .ctrl-btn, .flick-petal, .top-ctrl-btn, .suggest-btn');
             if (!btn) return;
