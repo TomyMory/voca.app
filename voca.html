@@ -11,9 +11,11 @@
         
         #top-bar { height: 25vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background-color: #1a252f; padding: 10px; box-sizing: border-box; border-bottom: 4px solid #34495e; }
         
+        /* テキスト表示エリア（確定文字と入力中文字を分ける） */
         .text-display { width: 90%; height: 60px; font-size: 38px; text-align: center; border-radius: 10px; background-color: #ecf0f1; color: #2c3e50; font-weight: bold; padding: 10px; margin-bottom: 8px; display: flex; justify-content: center; align-items: center; white-space: nowrap; overflow: hidden; }
         #current-input { color: #e74c3c; border-bottom: 4px solid #e74c3c; margin-left: 2px; }
 
+        /* 予測変換候補エリア */
         #suggestion-bar { width: 90%; height: 50px; display: flex; gap: 10px; justify-content: center; margin-bottom: 10px; }
         .suggest-btn { flex: 1; max-width: 180px; background-color: #f39c12; color: white; font-size: 22px; font-weight: bold; border-radius: 8px; border: none; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.1s; cursor: pointer; overflow: hidden; white-space: nowrap; padding: 0 10px; }
         
@@ -36,12 +38,14 @@
         #key-mod { background-color: #8e44ad; }
         .btn-red { background-color: #e74c3c !important; }
 
+        /* ホバー＆決定アクションの視覚効果 */
         .key.hovered, .ctrl-btn.hovered, .suggest-btn.hovered, #practice-target.hovered { background-color: #f1c40f !important; color: #2c3e50 !important; transform: scale(1.05); box-shadow: 0 8px 15px rgba(241, 196, 15, 0.4) !important; }
         .key.ready, .ctrl-btn.ready, .suggest-btn.ready, #practice-target.ready { background-color: #3498db !important; color: white !important; transform: scale(1.1) !important; box-shadow: 0 0 20px #3498db !important; border: 2px solid #fff; }
         .key.blink, .ctrl-btn.blink, .suggest-btn.blink, #practice-target.blink { background-color: #2ecc71 !important; color: white !important; transform: scale(1.15) !important; box-shadow: 0 0 25px #2ecc71 !important; transition: 0s !important; }
 
         video { display: none; }
         
+        /* フリックメニュー用のスタイル */
         #flick-overlay { position: absolute; z-index: 1000; display: none; pointer-events: none; }
         .flick-petal { position: absolute; width: 80px; height: 80px; background: #2980b9; border: 4px solid white; border-radius: 15px; color: white; display: flex; justify-content: center; align-items: center; font-size: 40px; font-weight: bold; transform: translate(-50%, -50%); transition: all 0.1s ease-out; pointer-events: auto; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
         .flick-petal.active { background: #f1c40f; color: #2c3e50; transform: translate(-50%, -50%) scale(1.15); border-color: #2c3e50; z-index: 1001; }
@@ -70,10 +74,14 @@
 <body>
 
     <div id="top-bar">
+        <!-- 確定文字と入力中文字を分ける -->
         <div class="text-display">
             <span id="confirmed-text"></span><span id="current-input"></span>
         </div>
+        
+        <!-- 予測変換の候補ボタンが並ぶエリア -->
         <div id="suggestion-bar"></div>
+
         <div class="controls">
             <button class="ctrl-btn top-ctrl-btn btn-red" data-action="clear">✖ 全部消す</button>
         </div>
@@ -101,6 +109,7 @@
         <div class="key ctrl-btn" id="key-speak" data-action="speak"><div class="main-char">🗣</div><div class="sub-chars">はなす</div></div>
     </div>
 
+    <!-- フリック入力展開用オーバーレイ -->
     <div id="flick-overlay">
         <div class="flick-petal petal-c" id="petal-c"></div>
         <div class="flick-petal petal-l" id="petal-l"></div>
@@ -109,7 +118,9 @@
         <div class="flick-petal petal-b" id="petal-b"></div>
     </div>
 
+    <!-- 練習用カーソル -->
     <div id="cursor"></div>
+
     <video id="webcam" autoplay playsinline muted></video>
     <div id="warning-msg">顔がカメラから離れすぎています。<br>もう少し近づいてください。</div>
 
@@ -124,6 +135,7 @@
     <div id="calib-instruction">顔を動かして赤い丸を指してください...</div>
 
     <script>
+        // エラー検知の安全装置
         window.onerror = function(message, source, lineno, colno, error) {
             const statusText = document.getElementById('status-text');
             const statusSub = document.getElementById('status-sub');
@@ -143,7 +155,13 @@
         const startBtn = document.getElementById('start-btn');
         const warningMsg = document.getElementById('warning-msg');
         
+        const calibTarget = document.getElementById('calib-target');
+        const practiceTarget = document.getElementById('practice-target');
+        const calibInstruction = document.getElementById('calib-instruction');
+
         let audioUnlocked = false;
+
+        // 文字入力の管理変数
         let confirmedText = "";
         let currentInput = "";
         let textHistory = [];
@@ -158,6 +176,7 @@
             currentInputEl.innerText = currentInput;
         }
 
+        // --- ★ 予測変換システム（ハイブリッド型） ★ ---
         const localDict = [
             "ありがとう", "おはよう", "こんにちは", "こんばんは", "さようなら", "おねがいします", "おつかれさま",
             "いきたい", "たべたい", "のみたい", "かえりたい", "たすけて", "きてください", 
@@ -169,7 +188,9 @@
                 renderSuggestions([]);
                 return;
             }
+
             let candidates = localDict.filter(word => word.startsWith(currentInput) && word !== currentInput);
+
             const script = document.createElement('script');
             script.src = `https://www.google.com/transliterate?langpair=ja-Hira|ja&text=${encodeURIComponent(currentInput)}&jsonp=googleSuggestCallback`;
             script.onload = () => script.remove();
@@ -198,6 +219,7 @@
                 btn.className = 'suggest-btn';
                 btn.innerText = word;
                 btn.dataset.text = word;
+                
                 btn.addEventListener('click', () => triggerSuggestion(word));
                 suggestionBar.appendChild(btn);
             });
@@ -208,7 +230,7 @@
             confirmedText += word;
             currentInput = "";
             updateTextDisplay();
-            renderSuggestions([]);
+            renderSuggestions([]); 
         }
 
         const flickMap = {
@@ -256,7 +278,8 @@
 
         function triggerAction(element) {
             if (!element) return;
-            if(!audioUnlocked) { speechSynthesis.speak(new SpeechSynthesisUtterance('')); audioUnlocked = true; }
+            if(!audioUnlocked) { try{ speechSynthesis.speak(new SpeechSynthesisUtterance('')); }catch(e){} audioUnlocked = true; }
+
             const action = element.dataset.action;
 
             if (action === 'undo') {
@@ -286,7 +309,9 @@
                     }
                 }
             } 
-            else if (action === 'speak') { speakText(); }
+            else if (action === 'speak') {
+                speakText();
+            }
             else if (action === 'delete') {
                 saveHistory();
                 if (currentInput.length > 0) {
@@ -300,8 +325,10 @@
             else if (action === 'clear') {
                 if(confirmedText.length > 0 || currentInput.length > 0) {
                     saveHistory(); 
-                    confirmedText = ""; currentInput = "";
-                    updateTextDisplay(); renderSuggestions([]);
+                    confirmedText = "";
+                    currentInput = "";
+                    updateTextDisplay();
+                    renderSuggestions([]);
                 }
             }
         }
@@ -316,9 +343,16 @@
         }
 
         let gameState = 'loading'; 
-        let cursorX = window.innerWidth / 2; let cursorY = window.innerHeight / 2;
-        let isMouthOpen = false; let lastClickTime = 0; let hoveredElement = null;
-        let activeFlickBase = null; let flickStartX = 0; let flickStartY = 0; let currentFlickSelection = 'c';
+        let cursorX = window.innerWidth / 2;
+        let cursorY = window.innerHeight / 2;
+        
+        let isMouthOpen = false;
+        let lastClickTime = 0;
+        let hoveredElement = null;
+        let activeFlickBase = null;
+        let flickStartX = 0;
+        let flickStartY = 0;
+        let currentFlickSelection = 'c';
 
         let calibData = { center: {x:0, y:0}, top: {x:0, y:0}, bottom: {x:0, y:0}, left: {x:0, y:0}, right: {x:0, y:0} };
         let calibBuffer = [];
@@ -347,7 +381,7 @@
             document.getElementById('status-sub').style.display = 'none'; 
             startBtn.style.display = 'none';
             
-            // ★ キャリブレーションの速度を大幅に短縮し、テキストで進行状況を通知 ★
+            // ★ キャリブレーション開始命令（欠落していた部分を完全修復） ★
             runCalibrationStep('center', 50, 50, '【1/5】顔を動かして、\n画面【中央】の赤い丸に鼻先を向けてください');
         });
 
@@ -371,13 +405,13 @@
                         calibTarget.style.display = 'none';
                         startPracticePhase();
                     }
-                }, 1200); // 記録時間 1.2秒に短縮
-            }, 800); // 待機時間 0.8秒に短縮
+                }, 1200); 
+            }, 800); 
         }
 
         function startPracticePhase() {
             currentPracticeIndex = 0;
-            cursor.style.display = 'block'; // 練習中はカーソル表示
+            cursor.style.display = 'block'; 
             showPracticeTarget();
         }
 
@@ -386,7 +420,7 @@
                 practiceTarget.style.display = 'none'; calibInstruction.style.display = 'none';
                 statusOverlay.style.display = 'none'; 
                 gameState = 'playing'; 
-                cursor.style.display = 'none'; // 本番はカーソル非表示
+                cursor.style.display = 'none'; 
                 return;
             }
             const step = practiceSteps[currentPracticeIndex]; gameState = step.id;
@@ -400,23 +434,29 @@
 
         function showFlickMenu(baseChar, keyElement) {
             activeFlickBase = baseChar;
-            flickStartX = cursorX; flickStartY = cursorY;
+            flickStartX = cursorX;
+            flickStartY = cursorY;
             currentFlickSelection = 'c';
 
             const rect = keyElement.getBoundingClientRect();
-            let fx = rect.left + rect.width/2; let fy = rect.top + rect.height/2;
+            let fx = rect.left + rect.width/2;
+            let fy = rect.top + rect.height/2;
+            
             const safeMargin = 140; 
             fx = Math.max(safeMargin, Math.min(window.innerWidth - safeMargin, fx));
             fy = Math.max(safeMargin, Math.min(window.innerHeight - safeMargin, fy));
 
-            flickOverlay.style.left = `${fx}px`; flickOverlay.style.top = `${fy}px`;
+            flickOverlay.style.left = `${fx}px`;
+            flickOverlay.style.top = `${fy}px`;
             
             const map = flickMap[baseChar];
             const petals = ['c', 'l', 't', 'r', 'b'];
             petals.forEach(p => {
                 const petalElem = document.getElementById(`petal-${p}`);
-                petalElem.innerText = map[p]; petalElem.dataset.char = map[p];
+                petalElem.innerText = map[p];
+                petalElem.dataset.char = map[p];
                 if(map[p] === '小') { petalElem.style.opacity = '0.5'; } else { petalElem.style.opacity = '1'; }
+                
                 if (p === 'c') petalElem.classList.add('active', 'ready');
                 else petalElem.classList.remove('active', 'ready');
             });
@@ -424,7 +464,8 @@
         }
 
         function hideFlickMenu() {
-            activeFlickBase = null; flickOverlay.style.display = 'none';
+            activeFlickBase = null;
+            flickOverlay.style.display = 'none';
         }
 
         function onResults(results) {
@@ -460,28 +501,37 @@
                     targetX = Math.max(0, Math.min(window.innerWidth, targetX));
                     targetY = Math.max(0, Math.min(window.innerHeight, targetY));
 
-                    cursorX += (targetX - cursorX) * 0.45; cursorY += (targetY - cursorY) * 0.45;
+                    cursorX += (targetX - cursorX) * 0.45; 
+                    cursorY += (targetY - cursorY) * 0.45;
 
                     if (gameState.startsWith('practice_')) {
-                        cursor.style.left = `${cursorX}px`; cursor.style.top = `${cursorY}px`;
+                        cursor.style.left = `${cursorX}px`;
+                        cursor.style.top = `${cursorY}px`;
                     }
 
                     if (activeFlickBase) {
-                        const dx = cursorX - flickStartX; const dy = cursorY - flickStartY;
+                        const dx = cursorX - flickStartX;
+                        const dy = cursorY - flickStartY;
                         const threshold = window.innerWidth * 0.05; 
-                        if (Math.hypot(dx, dy) < threshold) { currentFlickSelection = 'c'; } 
-                        else {
+
+                        if (Math.hypot(dx, dy) < threshold) {
+                            currentFlickSelection = 'c';
+                        } else {
                             if (Math.abs(dx) > Math.abs(dy)) { currentFlickSelection = dx < 0 ? 'l' : 'r'; } 
                             else { currentFlickSelection = dy < 0 ? 't' : 'b'; }
                         }
+
                         ['c', 'l', 't', 'r', 'b'].forEach(p => {
                             const petal = document.getElementById(`petal-${p}`);
-                            if (p === currentFlickSelection) { petal.classList.add('active'); if (isMouthOpen) petal.classList.add('ready'); } 
-                            else { petal.classList.remove('active', 'ready'); }
+                            if (p === currentFlickSelection) {
+                                petal.classList.add('active');
+                                if (isMouthOpen) petal.classList.add('ready');
+                            } else {
+                                petal.classList.remove('active', 'ready');
+                            }
                         });
                     } 
                     else {
-                        // ★ 的の中の文字を見つめても確実に選択できるように修正 ★
                         let elementUnderCursor = null;
                         const hitEl = document.elementFromPoint(cursorX, cursorY);
                         if (hitEl) {
@@ -491,6 +541,7 @@
                         if (hoveredElement && hoveredElement !== elementUnderCursor) {
                             hoveredElement.classList.remove('hovered', 'ready');
                         }
+                        
                         if (elementUnderCursor) {
                             elementUnderCursor.classList.add('hovered');
                             if (isMouthOpen) elementUnderCursor.classList.add('ready');
@@ -528,9 +579,12 @@
                                 cursor.classList.add('blink');
                                 setTimeout(() => cursor.classList.remove('blink'), 200);
                             }
+
                             let targetToBlink = activeFlickBase ? document.getElementById(`petal-${currentFlickSelection}`) : hoveredElement;
+
                             if (targetToBlink) {
-                                targetToBlink.classList.remove('ready'); targetToBlink.classList.add('blink');
+                                targetToBlink.classList.remove('ready');
+                                targetToBlink.classList.add('blink');
                                 setTimeout(() => targetToBlink.classList.remove('blink'), 200);
                             }
 
@@ -565,16 +619,24 @@
         document.addEventListener('click', (e) => {
             const btn = e.target.closest('.key, .ctrl-btn, .flick-petal, .top-ctrl-btn, .suggest-btn');
             if (!btn) return;
-            if(btn.classList.contains('flick-petal')) { triggerInput(btn.dataset.char); hideFlickMenu(); } 
-            else if(btn.classList.contains('base-key')) { triggerInput(flickMap[btn.dataset.base].c); } 
-            else if(btn.classList.contains('suggest-btn')) { triggerSuggestion(btn.dataset.text); } 
-            else { triggerAction(btn); }
+
+            if(btn.classList.contains('flick-petal')) {
+                triggerInput(btn.dataset.char);
+                hideFlickMenu();
+            } else if(btn.classList.contains('base-key')) {
+                triggerInput(flickMap[btn.dataset.base].c);
+            } else if(btn.classList.contains('suggest-btn')) {
+                triggerSuggestion(btn.dataset.text);
+            } else {
+                triggerAction(btn);
+            }
         });
 
         const video = document.getElementById('webcam');
         const faceMesh = new FaceMesh({locateFile: (file) => { return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`; }});
         faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         faceMesh.onResults(onResults);
+
         try {
             const camera = new Camera(video, { onFrame: async () => { await faceMesh.send({image: video}); }, width: 640, height: 480 });
             camera.start().catch(err => {
