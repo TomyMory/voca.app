@@ -387,7 +387,6 @@
                 document.getElementById('confirm-overlay').style.display = 'none';
                 gameState = 'playing';
             }
-            // ★ 中心リセットのアクション（ズレ計算の完全修正） ★
             else if (action === 'reset_center') {
                 gameState = 'reset_countdown';
                 const overlay = document.getElementById('reset-overlay');
@@ -406,7 +405,6 @@
                         timerEl.innerText = "完了！";
                         
                         if (window.latestNoseX !== 0 && window.latestNoseY !== 0) {
-                            // 新しい中心に対して、元の幅・高さを左右上下に均等に割り振る
                             const widthX = calibData.right.x - calibData.left.x;
                             const heightY = calibData.bottom.y - calibData.top.y;
                             
@@ -419,7 +417,6 @@
                             calibData.top.y = calibData.center.y - heightY / 2;
                             calibData.bottom.y = calibData.center.y + heightY / 2;
                             
-                            // カーソルの内部座標も強制的にど真ん中に戻す
                             smoothRatioX = 0.5; 
                             smoothRatioY = 0.5;
                         }
@@ -442,7 +439,6 @@
         let isMouthOpen = false; let lastClickTime = 0; let hoveredElement = null;
         let activeFlickBase = null; let flickStartRatioX = 0; let flickStartRatioY = 0; let currentFlickSelection = 'c';
         
-        // 誤爆防止用のフレームカウンター
         let mouthOpenFrames = 0;
         let mouthCloseFrames = 0;
 
@@ -575,8 +571,9 @@
                     targetRatioX = Math.max(-0.1, Math.min(1.1, targetRatioX));
                     targetRatioY = Math.max(-0.1, Math.min(1.1, targetRatioY));
 
-                    smoothRatioX += (targetRatioX - smoothRatioX) * 0.35; 
-                    smoothRatioY += (targetRatioY - smoothRatioY) * 0.35;
+                    // ★ ブレ低減：スピード（追従係数）を 0.35 から 0.20 に落として滑らかに ★
+                    smoothRatioX += (targetRatioX - smoothRatioX) * 0.20; 
+                    smoothRatioY += (targetRatioY - smoothRatioY) * 0.20;
 
                     let cursorPx = smoothRatioX * window.innerWidth;
                     let cursorPy = smoothRatioY * window.innerHeight;
@@ -652,17 +649,18 @@
                         hoveredElement = null;
                     }
 
-                    // --- ★ 口の開閉判定（誤爆防止と下向き対応） ★ ---
+                    // --- ★ 口の開閉判定（感度アップ＆高速決定） ★ ---
                     const upperLip = landmarks[13]; const lowerLip = landmarks[14];
                     const mouthRatio = Math.hypot(upperLip.x - lowerLip.x, upperLip.y - lowerLip.y) / faceHeight;
                     
-                    const MOUTH_OPEN_THRESH = 0.055;  
-                    // フリック展開中（下を向く作業中）は閉じる判定を極限まで甘くする
-                    const MOUTH_CLOSE_THRESH = activeFlickBase ? 0.012 : 0.020; 
+                    // 開く判定は少し甘く（感度アップ）
+                    const MOUTH_OPEN_THRESH = 0.045;  
+                    // 閉じる（決定する）判定は、下向きの誤爆を防ぐために早めに発動させる
+                    const MOUTH_CLOSE_THRESH = activeFlickBase ? 0.018 : 0.035; 
 
                     if (mouthRatio > MOUTH_OPEN_THRESH) {
                         mouthOpenFrames++;
-                        mouthCloseFrames = 0; // 閉じるカウントをリセット
+                        mouthCloseFrames = 0; 
                         
                         if (mouthOpenFrames >= 2 && !isMouthOpen) {
                             isMouthOpen = true;
@@ -678,14 +676,15 @@
                         mouthOpenFrames = 0;
                         if (isMouthOpen) {
                             mouthCloseFrames++;
-                            // 確実に2フレーム連続で閉じた時だけ決定する（一瞬のブレを無視）
-                            if (mouthCloseFrames >= 2) {
+                            // ★ 1フレームでも閉じる動きを見せたら即座に決定（スピード最優先） ★
+                            if (mouthCloseFrames >= 1) {
                                 isMouthOpen = false;
                                 mouthCloseFrames = 0;
                                 if (gameState.startsWith('practice_')) cursor.classList.remove('ready');
                                 
                                 const now = Date.now();
-                                if (now - lastClickTime > 600) { 
+                                // ★ 連打待機時間も 600ms -> 400ms に短縮してサクサク打てるように ★
+                                if (now - lastClickTime > 400) { 
                                     lastClickTime = now;
                                     
                                     if (gameState.startsWith('practice_')) {
@@ -718,9 +717,7 @@
                             }
                         }
                     } else {
-                        // 遊び（中間）領域ではカウントをリセットする
-                        mouthOpenFrames = 0;
-                        mouthCloseFrames = 0;
+                        if (!isMouthOpen) mouthOpenFrames = 0;
                     }
                 }
             } else {
