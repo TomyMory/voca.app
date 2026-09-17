@@ -18,7 +18,6 @@
         .text-display { flex: 1; height: 100%; font-size: clamp(16px, 5vw, 28px); text-align: left; border-radius: 8px; background-color: #ecf0f1; color: #2c3e50; font-weight: bold; padding: 5px 10px; box-sizing: border-box; display: block; white-space: pre-wrap; word-break: break-all; overflow-y: auto; line-height: 1.2; margin: 0; }
         #current-input { color: #e74c3c; border-bottom: 4px solid #e74c3c; margin-left: 2px; }
 
-        /* トップバーのボタン群 */
         .top-btn { width: clamp(60px, 14vw, 80px); height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; border-radius: 8px; font-weight: bold; flex-shrink: 0; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.1s; cursor: pointer; }
         .top-btn .main-char { font-size: clamp(16px, 5vw, 24px); pointer-events: none; }
         .top-btn .sub-chars { font-size: clamp(9px, 2.5vw, 12px); pointer-events: none; margin-top: 2px;}
@@ -74,7 +73,7 @@
         .btn-yes { background: #e74c3c; color: white; }
         .btn-no { background: #95a5a6; color: white; }
 
-        /* --- ★ 中心リセット カウントダウン画面 ★ --- */
+        /* --- 中心リセット カウントダウン画面 --- */
         #reset-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 4500; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; }
         #reset-overlay h1 { font-size: clamp(24px, 7vw, 40px); color: #f1c40f; margin-bottom: 10px; text-align: center; }
         #reset-timer { font-size: 100px; font-weight: bold; color: #e74c3c; }
@@ -99,7 +98,6 @@
                 <span id="confirmed-text"></span><span id="current-input"></span>
             </div>
             
-            <!-- ★ 新設：位置リセットボタン ★ -->
             <div id="btn-reset-center" class="top-btn hit-target top-hit" data-action="reset_center">
                 <div class="main-char">🎯</div><div class="sub-chars">位置ﾘｾｯﾄ</div>
             </div>
@@ -111,6 +109,7 @@
         <div id="suggestion-bar"></div>
     </div>
 
+    <!-- 5列×4段 スマホ風レイアウト -->
     <div id="keyboard">
         <div class="ctrl-btn hit-target mode-btn" data-action="mode" data-val="number"><div class="main-char">123</div></div>
         <div class="key hit-target dynamic-key" data-id="0"></div>
@@ -137,6 +136,7 @@
         <div class="ctrl-btn hit-target" data-action="undo"><div class="main-char">↩</div><div class="sub-chars">1つ戻る</div></div>
     </div>
 
+    <!-- フリック入力展開用オーバーレイ -->
     <div id="flick-overlay">
         <div class="flick-petal hit-target petal-c" data-pid="c" id="petal-c"></div>
         <div class="flick-petal hit-target petal-l" data-pid="l" id="petal-l"></div>
@@ -156,7 +156,7 @@
         </div>
     </div>
 
-    <!-- ★ 中心リセット用カウントダウン画面 ★ -->
+    <!-- 中心リセット用カウントダウン画面 -->
     <div id="reset-overlay">
         <h1>画面中央の「な」を<br>見つめてください</h1>
         <div id="reset-timer">3</div>
@@ -204,7 +204,7 @@
         let textHistory = [];
         let currentMode = 'hiragana';
 
-        // ★ 顔の最新座標を常に保存しておく変数（リセット計算用） ★
+        // 顔の最新座標を常に保存しておく変数
         window.latestNoseX = 0;
         window.latestNoseY = 0;
 
@@ -216,8 +216,6 @@
         function updateTextDisplay() {
             confirmedTextEl.innerText = confirmedText;
             currentInputEl.innerText = currentInput;
-            
-            // 自動スクロール（文字が溢れたら一番下を表示）
             const displayDiv = document.querySelector('.text-display');
             displayDiv.scrollTop = displayDiv.scrollHeight;
         }
@@ -248,7 +246,7 @@
             suggestionBar.innerHTML = '';
             list.forEach(word => {
                 const btn = document.createElement('div');
-                btn.className = 'suggest-btn hit-target';
+                btn.className = 'suggest-btn hit-target top-hit';
                 btn.innerText = word;
                 btn.dataset.action = 'suggest';
                 btn.dataset.val = word;
@@ -365,9 +363,7 @@
                     if(dakutenCycle[lastChar]) { saveHistory(); confirmedText = confirmedText.slice(0, -1) + dakutenCycle[lastChar]; updateTextDisplay(); }
                 }
             } 
-            else if (action === 'speak') {
-                speakText();
-            }
+            else if (action === 'speak') { speakText(); }
             else if (action === 'delete') {
                 saveHistory();
                 if (currentInput.length > 0) { currentInput = currentInput.slice(0, -1); fetchSuggestions(); } 
@@ -391,7 +387,7 @@
                 document.getElementById('confirm-overlay').style.display = 'none';
                 gameState = 'playing';
             }
-            // ★ 中心リセットのアクション ★
+            // ★ 中心リセットのアクション（ズレ計算の完全修正） ★
             else if (action === 'reset_center') {
                 gameState = 'reset_countdown';
                 const overlay = document.getElementById('reset-overlay');
@@ -407,18 +403,25 @@
                         timerEl.innerText = count;
                     } else {
                         clearInterval(countInterval);
-                        timerEl.innerText = "リセット完了！";
+                        timerEl.innerText = "完了！";
                         
-                        // 現在の鼻の座標と、元の中心座標の「差分」を計算してシフトする
                         if (window.latestNoseX !== 0 && window.latestNoseY !== 0) {
-                            const dx = window.latestNoseX - calibData.center.x;
-                            const dy = window.latestNoseY - calibData.center.y;
-                            calibData.center.x += dx; calibData.center.y += dy;
-                            calibData.top.y += dy;    calibData.bottom.y += dy;
-                            calibData.left.x += dx;   calibData.right.x += dx;
+                            // 新しい中心に対して、元の幅・高さを左右上下に均等に割り振る
+                            const widthX = calibData.right.x - calibData.left.x;
+                            const heightY = calibData.bottom.y - calibData.top.y;
                             
-                            // カーソル位置を強制的に真ん中（な）に戻す
-                            smoothRatioX = 0.5; smoothRatioY = 0.5;
+                            calibData.center.x = window.latestNoseX;
+                            calibData.center.y = window.latestNoseY;
+                            
+                            calibData.left.x = calibData.center.x - widthX / 2;
+                            calibData.right.x = calibData.center.x + widthX / 2;
+                            
+                            calibData.top.y = calibData.center.y - heightY / 2;
+                            calibData.bottom.y = calibData.center.y + heightY / 2;
+                            
+                            // カーソルの内部座標も強制的にど真ん中に戻す
+                            smoothRatioX = 0.5; 
+                            smoothRatioY = 0.5;
                         }
                         
                         setTimeout(() => {
@@ -439,7 +442,9 @@
         let isMouthOpen = false; let lastClickTime = 0; let hoveredElement = null;
         let activeFlickBase = null; let flickStartRatioX = 0; let flickStartRatioY = 0; let currentFlickSelection = 'c';
         
+        // 誤爆防止用のフレームカウンター
         let mouthOpenFrames = 0;
+        let mouthCloseFrames = 0;
 
         let calibData = { center: {x:0, y:0}, top: {x:0, y:0}, bottom: {x:0, y:0}, left: {x:0, y:0}, right: {x:0, y:0} };
         let calibBuffer = [];
@@ -552,7 +557,6 @@
                 else { warningMsg.style.display = 'none'; }
 
                 const nose = landmarks[1];
-                // 常に最新の鼻座標を記録（リセット計算用）
                 window.latestNoseX = nose.x;
                 window.latestNoseY = nose.y;
 
@@ -648,14 +652,18 @@
                         hoveredElement = null;
                     }
 
+                    // --- ★ 口の開閉判定（誤爆防止と下向き対応） ★ ---
                     const upperLip = landmarks[13]; const lowerLip = landmarks[14];
                     const mouthRatio = Math.hypot(upperLip.x - lowerLip.x, upperLip.y - lowerLip.y) / faceHeight;
                     
-                    const MOUTH_OPEN_THRESH = 0.065;  
-                    const MOUTH_CLOSE_THRESH = 0.030; 
+                    const MOUTH_OPEN_THRESH = 0.055;  
+                    // フリック展開中（下を向く作業中）は閉じる判定を極限まで甘くする
+                    const MOUTH_CLOSE_THRESH = activeFlickBase ? 0.012 : 0.020; 
 
                     if (mouthRatio > MOUTH_OPEN_THRESH) {
                         mouthOpenFrames++;
+                        mouthCloseFrames = 0; // 閉じるカウントをリセット
+                        
                         if (mouthOpenFrames >= 2 && !isMouthOpen) {
                             isMouthOpen = true;
                             if (gameState.startsWith('practice_')) cursor.classList.add('ready');
@@ -669,43 +677,50 @@
                     else if (mouthRatio < MOUTH_CLOSE_THRESH) {
                         mouthOpenFrames = 0;
                         if (isMouthOpen) {
-                            isMouthOpen = false;
-                            if (gameState.startsWith('practice_')) cursor.classList.remove('ready');
-                            
-                            const now = Date.now();
-                            if (now - lastClickTime > 600) { 
-                                lastClickTime = now;
+                            mouthCloseFrames++;
+                            // 確実に2フレーム連続で閉じた時だけ決定する（一瞬のブレを無視）
+                            if (mouthCloseFrames >= 2) {
+                                isMouthOpen = false;
+                                mouthCloseFrames = 0;
+                                if (gameState.startsWith('practice_')) cursor.classList.remove('ready');
                                 
-                                if (gameState.startsWith('practice_')) {
-                                    cursor.classList.add('blink');
-                                    setTimeout(() => cursor.classList.remove('blink'), 200);
-                                }
+                                const now = Date.now();
+                                if (now - lastClickTime > 600) { 
+                                    lastClickTime = now;
+                                    
+                                    if (gameState.startsWith('practice_')) {
+                                        cursor.classList.add('blink');
+                                        setTimeout(() => cursor.classList.remove('blink'), 200);
+                                    }
 
-                                let targetToBlink = activeFlickBase ? document.getElementById(`petal-${currentFlickSelection}`) : hoveredElement;
-                                if (targetToBlink) {
-                                    targetToBlink.classList.remove('ready', 'hovered');
-                                    targetToBlink.classList.add('blink');
-                                    let el = targetToBlink; 
-                                    setTimeout(() => { el.classList.remove('blink', 'ready', 'active'); }, 200);
-                                }
+                                    let targetToBlink = activeFlickBase ? document.getElementById(`petal-${currentFlickSelection}`) : hoveredElement;
+                                    if (targetToBlink) {
+                                        targetToBlink.classList.remove('ready', 'hovered');
+                                        targetToBlink.classList.add('blink');
+                                        let el = targetToBlink; 
+                                        setTimeout(() => { el.classList.remove('blink', 'ready', 'active'); }, 200);
+                                    }
 
-                                if (activeFlickBase) {
-                                    let charToInput = flickMap[activeFlickBase][currentFlickSelection];
-                                    if(charToInput) { triggerInput(charToInput); }
-                                    hideFlickMenu();
-                                } 
-                                else if (hoveredElement) {
-                                    if (gameState.startsWith('practice_') && hoveredElement.id === 'practice-target') {
-                                        advancePractice();
+                                    if (activeFlickBase) {
+                                        let charToInput = flickMap[activeFlickBase][currentFlickSelection];
+                                        if(charToInput) { triggerInput(charToInput); }
+                                        hideFlickMenu();
                                     } 
-                                    else if (hoveredElement.dataset.action) {
-                                        triggerAction(hoveredElement);
+                                    else if (hoveredElement) {
+                                        if (gameState.startsWith('practice_') && hoveredElement.id === 'practice-target') {
+                                            advancePractice();
+                                        } 
+                                        else if (hoveredElement.dataset.action) {
+                                            triggerAction(hoveredElement);
+                                        }
                                     }
                                 }
                             }
                         }
                     } else {
-                        if (!isMouthOpen) mouthOpenFrames = 0;
+                        // 遊び（中間）領域ではカウントをリセットする
+                        mouthOpenFrames = 0;
+                        mouthCloseFrames = 0;
                     }
                 }
             } else {
