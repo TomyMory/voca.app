@@ -13,15 +13,17 @@
 
         /* --- トップバー領域 --- */
         #top-bar { height: 22vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background-color: #1a252f; padding: 5px 10px; box-sizing: border-box; border-bottom: 4px solid #34495e; gap: 5px; }
-        .top-row { display: flex; width: 100%; height: 60%; gap: 8px; justify-content: space-between; }
+        .top-row { display: flex; width: 100%; height: 60%; gap: 6px; justify-content: space-between; }
         
-        /* ★ 修正：文字が自動で改行され、スクロールできるように変更 ★ */
         .text-display { flex: 1; height: 100%; font-size: clamp(16px, 5vw, 28px); text-align: left; border-radius: 8px; background-color: #ecf0f1; color: #2c3e50; font-weight: bold; padding: 5px 10px; box-sizing: border-box; display: block; white-space: pre-wrap; word-break: break-all; overflow-y: auto; line-height: 1.2; margin: 0; }
         #current-input { color: #e74c3c; border-bottom: 4px solid #e74c3c; margin-left: 2px; }
 
-        #btn-clear-all { width: clamp(60px, 15vw, 80px); height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background-color: #e74c3c; color: white; border-radius: 8px; font-weight: bold; flex-shrink: 0; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.1s; cursor: pointer; }
-        #btn-clear-all .main-char { font-size: clamp(16px, 5vw, 24px); pointer-events: none; }
-        #btn-clear-all .sub-chars { font-size: clamp(9px, 2.5vw, 12px); pointer-events: none; margin-top: 2px;}
+        /* トップバーのボタン群 */
+        .top-btn { width: clamp(60px, 14vw, 80px); height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; border-radius: 8px; font-weight: bold; flex-shrink: 0; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.1s; cursor: pointer; }
+        .top-btn .main-char { font-size: clamp(16px, 5vw, 24px); pointer-events: none; }
+        .top-btn .sub-chars { font-size: clamp(9px, 2.5vw, 12px); pointer-events: none; margin-top: 2px;}
+        #btn-reset-center { background-color: #9b59b6; }
+        #btn-clear-all { background-color: #e74c3c; }
 
         #suggestion-bar { width: 100%; height: 35%; display: flex; gap: 5px; justify-content: center; }
         .suggest-btn { flex: 1; background-color: #f39c12; color: white; font-size: clamp(12px, 3.5vw, 20px); font-weight: bold; border-radius: 6px; border: none; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.1s; cursor: pointer; overflow: hidden; white-space: nowrap; padding: 0 5px; text-overflow: ellipsis; }
@@ -63,7 +65,7 @@
 
         @media (max-width: 600px) { :root { --flick-size: 65px; --flick-spread: 75px; } }
 
-        /* --- ★ 新設：全消しの確認ポップアップ ★ --- */
+        /* --- 全消し確認ポップアップ --- */
         #confirm-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 4000; display: none; flex-direction: column; justify-content: center; align-items: center; }
         .confirm-box { background: #ecf0f1; border-radius: 15px; padding: 30px; text-align: center; width: 80%; max-width: 500px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         .confirm-msg { font-size: clamp(20px, 6vw, 32px); color: #2c3e50; font-weight: bold; margin-bottom: 30px; line-height: 1.4; }
@@ -71,6 +73,11 @@
         .confirm-btn { flex: 1; height: clamp(60px, 15vw, 90px); font-size: clamp(18px, 5vw, 28px); font-weight: bold; border-radius: 10px; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); cursor: pointer; transition: all 0.1s; }
         .btn-yes { background: #e74c3c; color: white; }
         .btn-no { background: #95a5a6; color: white; }
+
+        /* --- ★ 中心リセット カウントダウン画面 ★ --- */
+        #reset-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 4500; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; }
+        #reset-overlay h1 { font-size: clamp(24px, 7vw, 40px); color: #f1c40f; margin-bottom: 10px; text-align: center; }
+        #reset-timer { font-size: 100px; font-weight: bold; color: #e74c3c; }
 
         video { display: none; }
         #status-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; text-align: center; color: white; }
@@ -91,14 +98,19 @@
             <div class="text-display">
                 <span id="confirmed-text"></span><span id="current-input"></span>
             </div>
-            <div id="btn-clear-all" class="ctrl-btn hit-target" data-action="clear">
+            
+            <!-- ★ 新設：位置リセットボタン ★ -->
+            <div id="btn-reset-center" class="top-btn hit-target top-hit" data-action="reset_center">
+                <div class="main-char">🎯</div><div class="sub-chars">位置ﾘｾｯﾄ</div>
+            </div>
+
+            <div id="btn-clear-all" class="top-btn hit-target top-hit" data-action="clear">
                 <div class="main-char">✖</div><div class="sub-chars">全消し</div>
             </div>
         </div>
         <div id="suggestion-bar"></div>
     </div>
 
-    <!-- 5列×4段 スマホ風レイアウト -->
     <div id="keyboard">
         <div class="ctrl-btn hit-target mode-btn" data-action="mode" data-val="number"><div class="main-char">123</div></div>
         <div class="key hit-target dynamic-key" data-id="0"></div>
@@ -125,7 +137,6 @@
         <div class="ctrl-btn hit-target" data-action="undo"><div class="main-char">↩</div><div class="sub-chars">1つ戻る</div></div>
     </div>
 
-    <!-- フリック入力展開用オーバーレイ -->
     <div id="flick-overlay">
         <div class="flick-petal hit-target petal-c" data-pid="c" id="petal-c"></div>
         <div class="flick-petal hit-target petal-l" data-pid="l" id="petal-l"></div>
@@ -134,7 +145,7 @@
         <div class="flick-petal hit-target petal-b" data-pid="b" id="petal-b"></div>
     </div>
 
-    <!-- ★ 全消し確認用ポップアップ ★ -->
+    <!-- 全消し確認用ポップアップ -->
     <div id="confirm-overlay">
         <div class="confirm-box">
             <div class="confirm-msg">全て消しても<br>良いですか？</div>
@@ -143,6 +154,12 @@
                 <div class="confirm-btn btn-no hit-target" data-action="clear_no">いいえ</div>
             </div>
         </div>
+    </div>
+
+    <!-- ★ 中心リセット用カウントダウン画面 ★ -->
+    <div id="reset-overlay">
+        <h1>画面中央の「な」を<br>見つめてください</h1>
+        <div id="reset-timer">3</div>
     </div>
 
     <div id="cursor"></div>
@@ -187,6 +204,10 @@
         let textHistory = [];
         let currentMode = 'hiragana';
 
+        // ★ 顔の最新座標を常に保存しておく変数（リセット計算用） ★
+        window.latestNoseX = 0;
+        window.latestNoseY = 0;
+
         function saveHistory() {
             textHistory.push({ c: confirmedText, i: currentInput });
             if (textHistory.length > 20) textHistory.shift();
@@ -195,6 +216,10 @@
         function updateTextDisplay() {
             confirmedTextEl.innerText = confirmedText;
             currentInputEl.innerText = currentInput;
+            
+            // 自動スクロール（文字が溢れたら一番下を表示）
+            const displayDiv = document.querySelector('.text-display');
+            displayDiv.scrollTop = displayDiv.scrollHeight;
         }
 
         const localDict = ["ありがとう", "おはよう", "こんにちは", "こんばんは", "おねがいします", "いきたい", "たべたい", "のみたい", "トイレ", "いたい", "あつい", "さむい", "はい", "いいえ"];
@@ -349,14 +374,12 @@
                 else if (confirmedText.length > 0) { confirmedText = confirmedText.slice(0, -1); }
                 updateTextDisplay();
             }
-            // ★ 全消しのアクション（ポップアップ表示） ★
             else if (action === 'clear') {
                 if(confirmedText.length > 0 || currentInput.length > 0) {
                     document.getElementById('confirm-overlay').style.display = 'flex';
                     gameState = 'confirm_clear';
                 }
             }
-            // ★ ポップアップの「はい」を押した時 ★
             else if (action === 'clear_yes') {
                 saveHistory(); 
                 confirmedText = ""; currentInput = "";
@@ -364,10 +387,46 @@
                 document.getElementById('confirm-overlay').style.display = 'none';
                 gameState = 'playing';
             }
-            // ★ ポップアップの「いいえ」を押した時 ★
             else if (action === 'clear_no') {
                 document.getElementById('confirm-overlay').style.display = 'none';
                 gameState = 'playing';
+            }
+            // ★ 中心リセットのアクション ★
+            else if (action === 'reset_center') {
+                gameState = 'reset_countdown';
+                const overlay = document.getElementById('reset-overlay');
+                const timerEl = document.getElementById('reset-timer');
+                overlay.style.display = 'flex';
+                
+                let count = 3;
+                timerEl.innerText = count;
+                
+                const countInterval = setInterval(() => {
+                    count--;
+                    if (count > 0) {
+                        timerEl.innerText = count;
+                    } else {
+                        clearInterval(countInterval);
+                        timerEl.innerText = "リセット完了！";
+                        
+                        // 現在の鼻の座標と、元の中心座標の「差分」を計算してシフトする
+                        if (window.latestNoseX !== 0 && window.latestNoseY !== 0) {
+                            const dx = window.latestNoseX - calibData.center.x;
+                            const dy = window.latestNoseY - calibData.center.y;
+                            calibData.center.x += dx; calibData.center.y += dy;
+                            calibData.top.y += dy;    calibData.bottom.y += dy;
+                            calibData.left.x += dx;   calibData.right.x += dx;
+                            
+                            // カーソル位置を強制的に真ん中（な）に戻す
+                            smoothRatioX = 0.5; smoothRatioY = 0.5;
+                        }
+                        
+                        setTimeout(() => {
+                            overlay.style.display = 'none';
+                            gameState = 'playing';
+                        }, 800);
+                    }
+                }, 1000);
             }
         }
 
@@ -380,7 +439,6 @@
         let isMouthOpen = false; let lastClickTime = 0; let hoveredElement = null;
         let activeFlickBase = null; let flickStartRatioX = 0; let flickStartRatioY = 0; let currentFlickSelection = 'c';
         
-        // 誤爆防止用のフレームカウンター
         let mouthOpenFrames = 0;
 
         let calibData = { center: {x:0, y:0}, top: {x:0, y:0}, bottom: {x:0, y:0}, left: {x:0, y:0}, right: {x:0, y:0} };
@@ -469,7 +527,6 @@
                 } else {
                     petalElem.style.display = 'none'; 
                 }
-                // 表示する時に古いクラスを確実に消去
                 petalElem.classList.remove('hovered', 'ready', 'blink', 'active');
             });
             flickOverlay.style.display = 'block';
@@ -495,6 +552,9 @@
                 else { warningMsg.style.display = 'none'; }
 
                 const nose = landmarks[1];
+                // 常に最新の鼻座標を記録（リセット計算用）
+                window.latestNoseX = nose.x;
+                window.latestNoseY = nose.y;
 
                 if (gameState.startsWith('calib_')) {
                     if (calibInstruction.innerText.includes("記録中")) calibBuffer.push({ x: nose.x, y: nose.y });
@@ -504,7 +564,6 @@
                     let targetRatioX = mapRange(nose.x, calibData.left.x, calibData.right.x, 0.0, 1.0);
                     let targetRatioY = mapRange(nose.y, calibData.top.y, calibData.bottom.y, 0.0, 1.0);
                     
-                    // ★ スピードを最適化（増幅を1.6 -> 1.35に落とし、スムージングを強める） ★
                     targetRatioX = 0.5 + (targetRatioX - 0.5) * 1.35;
                     targetRatioY = 0.5 + (targetRatioY - 0.5) * 1.35;
                     if (targetRatioY > 0.5) { targetRatioY = 0.5 + (targetRatioY - 0.5) * 1.1; }
@@ -524,9 +583,7 @@
 
                     let elementUnderCursor = null;
 
-                    // --- ★ 最寄りボタンのスナップ判定 ★ ---
                     if (gameState === 'confirm_clear') {
-                        // 全消し確認ポップアップ中
                         let minDist = Infinity;
                         document.querySelectorAll('#confirm-overlay .hit-target').forEach(el => {
                             let rect = el.getBoundingClientRect();
@@ -580,7 +637,6 @@
                         if (dist < 150) { elementUnderCursor = practiceTarget; }
                     }
 
-                    // 状態の更新（古いクラスを確実に消す）
                     if (hoveredElement && hoveredElement !== elementUnderCursor) {
                         hoveredElement.classList.remove('hovered', 'ready', 'blink');
                     }
@@ -592,22 +648,19 @@
                         hoveredElement = null;
                     }
 
-                    // --- ★ 口の開閉判定（誤爆防止の強化） ★ ---
                     const upperLip = landmarks[13]; const lowerLip = landmarks[14];
                     const mouthRatio = Math.hypot(upperLip.x - lowerLip.x, upperLip.y - lowerLip.y) / faceHeight;
                     
-                    const MOUTH_OPEN_THRESH = 0.065;  // 閾値を少し上げて誤爆防止
-                    const MOUTH_CLOSE_THRESH = 0.030; // 閉じた判定の閾値
+                    const MOUTH_OPEN_THRESH = 0.065;  
+                    const MOUTH_CLOSE_THRESH = 0.030; 
 
                     if (mouthRatio > MOUTH_OPEN_THRESH) {
                         mouthOpenFrames++;
-                        // 2フレーム連続で開いていると判定されたら本物
                         if (mouthOpenFrames >= 2 && !isMouthOpen) {
                             isMouthOpen = true;
                             if (gameState.startsWith('practice_')) cursor.classList.add('ready');
                             if (hoveredElement) hoveredElement.classList.add('ready');
                             
-                            // フリックメニューの展開
                             if (gameState === 'playing' && hoveredElement && hoveredElement.dataset.base) {
                                 showFlickMenu(hoveredElement.dataset.base, hoveredElement);
                             }
@@ -628,12 +681,11 @@
                                     setTimeout(() => cursor.classList.remove('blink'), 200);
                                 }
 
-                                // 決定したボタンの緑色アニメーション（確実に消すように修正）
                                 let targetToBlink = activeFlickBase ? document.getElementById(`petal-${currentFlickSelection}`) : hoveredElement;
                                 if (targetToBlink) {
                                     targetToBlink.classList.remove('ready', 'hovered');
                                     targetToBlink.classList.add('blink');
-                                    let el = targetToBlink; // 参照を保存しておく
+                                    let el = targetToBlink; 
                                     setTimeout(() => { el.classList.remove('blink', 'ready', 'active'); }, 200);
                                 }
 
@@ -653,7 +705,6 @@
                             }
                         }
                     } else {
-                        // 中間領域（遊び）
                         if (!isMouthOpen) mouthOpenFrames = 0;
                     }
                 }
