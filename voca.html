@@ -173,7 +173,7 @@
     </div>
 
     <div id="calib-target"></div>
-    <div id="practice-target" class="hit-target" style="display: none;">ここを見て<br>右目を閉じる</div>
+    <div id="practice-target" class="hit-target" style="display: none;">ここを見て<br>目を閉じる</div>
     <div id="calib-instruction">顔を動かして赤い丸を指してください...</div>
 
     <script>
@@ -206,6 +206,11 @@
 
         window.latestNoseX = 0;
         window.latestNoseY = 0;
+
+        // ★ 自動判定された操作用の目と閾値を保存する変数 ★
+        window.activeEye = 'left'; 
+        window.eyeOpenBase = 0.25;
+        window.eyeClosedBase = 0.05;
 
         function saveHistory() {
             textHistory.push({ c: confirmedText, i: currentInput });
@@ -433,20 +438,23 @@
             saveHistory(); currentInput += char; updateTextDisplay(); fetchSuggestions();
         }
 
-        // --- ★ 右目の縦横比（EAR）を計算する関数 ★ ---
-        function getRightEyeEAR(landmarks) {
-            // ユーザー自身の右目（画面向かって左側の目）のランドマークインデックス
-            const top = landmarks[159];
-            const bot = landmarks[145];
-            const inC = landmarks[133];
-            const outC = landmarks[33];
-            
-            const eyeWidth = Math.hypot(inC.x - outC.x, inC.y - outC.y);
-            const eyeHeight = Math.hypot(top.x - bot.x, top.y - bot.y);
-            
-            // 幅が0などのエラー回避
-            if (eyeWidth < 0.001) return 0.2; 
-            return eyeHeight / eyeWidth;
+        // --- ★ 両目のEAR（縦横比）を計算する関数 ★ ---
+        function getEyeEAR(landmarks, type) {
+            if (type === 'left') {
+                // 画像上の左目 (カメラ反転時はユーザーの右目)
+                const top = landmarks[159], bot = landmarks[145];
+                const inC = landmarks[133], outC = landmarks[33];
+                const w = Math.hypot(inC.x - outC.x, inC.y - outC.y);
+                const h = Math.hypot(top.x - bot.x, top.y - bot.y);
+                return h / (w || 0.001);
+            } else {
+                // 画像上の右目 (カメラ反転時はユーザーの左目)
+                const top = landmarks[386], bot = landmarks[374];
+                const inC = landmarks[362], outC = landmarks[263];
+                const w = Math.hypot(inC.x - outC.x, inC.y - outC.y);
+                const h = Math.hypot(top.x - bot.x, top.y - bot.y);
+                return h / (w || 0.001);
+            }
         }
 
         let gameState = 'loading'; 
@@ -463,11 +471,11 @@
         let calibBuffer = [];
         
         const practiceSteps = [
-            { id: 'practice_center', x: 0.5, y: 0.5, msg: "【練習 1/5】\n光っている的を見て、\n「右目を閉じて、開く」と決定します" },
-            { id: 'practice_top', x: 0.5, y: 0.3, msg: "【練習 2/5】\n上の的を見て、右目で決定" },
-            { id: 'practice_bottom', x: 0.5, y: 0.8, msg: "【練習 3/5】\n下の的を見て、右目で決定" },
-            { id: 'practice_left', x: 0.2, y: 0.5, msg: "【練習 4/5】\n左の的を見て、右目で決定" },
-            { id: 'practice_right', x: 0.8, y: 0.5, msg: "【練習 5/5】\n右の的を見て、右目で決定" }
+            { id: 'practice_center', x: 0.5, y: 0.5, msg: "【練習 1/5】\n光っている的を見て、\n「目を閉じて、開く」と決定します" },
+            { id: 'practice_top', x: 0.5, y: 0.3, msg: "【練習 2/5】\n上の的を見て、目で決定" },
+            { id: 'practice_bottom', x: 0.5, y: 0.8, msg: "【練習 3/5】\n下の的を見て、目で決定" },
+            { id: 'practice_left', x: 0.2, y: 0.5, msg: "【練習 4/5】\n左の的を見て、目で決定" },
+            { id: 'practice_right', x: 0.8, y: 0.5, msg: "【練習 5/5】\n右の的を見て、目で決定" }
         ];
         let currentPracticeIndex = 0;
 
@@ -484,38 +492,76 @@
             document.getElementById('status-text').style.display = 'none'; document.getElementById('status-sub').style.display = 'none'; 
             startBtn.style.display = 'none';
             // 全7ステップに変更
-            runCalibrationStep('center', 50, 50, '【1/7】顔を動かして、\n画面【中央】の赤い丸に鼻先を向けてください');
+            runCalibrationStep('center', 50, 50, '【1/7】顔を動かして、\n画面【中央】の赤い丸に鼻先を向けてください', 1200);
         });
 
-        function runCalibrationStep(step, xPercent, yPercent, message) {
+        // ★ カウントダウン付きの丁寧なキャリブレーション ★
+        function runCalibrationStep(step, xPercent, yPercent, message, durationMs) {
             gameState = `calib_${step}`; calibBuffer = [];
             calibTarget.style.display = 'block'; calibInstruction.style.display = 'block';
             calibInstruction.innerText = message;
             calibTarget.style.left = `${xPercent}%`; calibTarget.style.top = `${yPercent}%`;
 
             setTimeout(() => {
-                calibInstruction.innerText = "【記録中...】そのままお待ちください";
+                let timeLeft = durationMs / 1000;
+                calibInstruction.innerText = `【記録中】そのままキープ... ${timeLeft}秒`;
+                
+                let countInterval = setInterval(() => {
+                    timeLeft -= 0.5;
+                    if(timeLeft > 0) {
+                        calibInstruction.innerText = `【記録中】そのままキープ... ${Math.ceil(timeLeft)}秒`;
+                    }
+                }, 500);
+
                 setTimeout(() => {
-                    let avgX = 0, avgY = 0, avgEar = 0;
+                    clearInterval(countInterval);
+                    let avgX = 0, avgY = 0, avgEarL = 0, avgEarR = 0;
                     if(calibBuffer.length > 0) { 
-                        calibBuffer.forEach(d => { avgX += d.x; avgY += d.y; avgEar += d.ear; }); 
+                        calibBuffer.forEach(d => { 
+                            avgX += d.x; avgY += d.y; 
+                            avgEarL += d.ear_l; avgEarR += d.ear_r; 
+                        }); 
                         calibData[step] = { 
                             x: avgX / calibBuffer.length, 
                             y: avgY / calibBuffer.length,
-                            ear: avgEar / calibBuffer.length 
+                            ear_l: avgEarL / calibBuffer.length, 
+                            ear_r: avgEarR / calibBuffer.length 
                         }; 
                     }
                     
-                    // ★ ステップに目のキャリブレーション（eye_open, eye_closed）を追加 ★
-                    if(step === 'center') runCalibrationStep('top', 50, 20, '【2/7】顔を上に向けて、\n画面【上部】の赤い丸に鼻先を向けてください');
-                    else if(step === 'top') runCalibrationStep('bottom', 50, 80, '【3/7】顔を下に向けて、\n画面【下部】の赤い丸に鼻先を向けてください');
-                    else if(step === 'bottom') runCalibrationStep('left', 20, 50, '【4/7】顔を左に向けて、\n画面【左部】の赤い丸に鼻先を向けてください');
-                    else if(step === 'left') runCalibrationStep('right', 80, 50, '【5/7】顔を右に向けて、\n画面【右部】の赤い丸に鼻先を向けてください');
-                    else if(step === 'right') runCalibrationStep('eye_open', 50, 50, '【6/7】リラックスして普通に\n目を開いたまま画面を見てください');
-                    else if(step === 'eye_open') runCalibrationStep('eye_closed', 50, 50, '【7/7】「右目」だけを\nギュッと閉じたままにしてください');
-                    else if(step === 'eye_closed') { calibTarget.style.display = 'none'; startPracticePhase(); }
-                }, 1200); 
-            }, 800); 
+                    if(step === 'center') runCalibrationStep('top', 50, 20, '【2/7】顔を上に向けて、\n画面【上部】の赤い丸に鼻先を向けてください', 1200);
+                    else if(step === 'top') runCalibrationStep('bottom', 50, 80, '【3/7】顔を下に向けて、\n画面【下部】の赤い丸に鼻先を向けてください', 1200);
+                    else if(step === 'bottom') runCalibrationStep('left', 20, 50, '【4/7】顔を左に向けて、\n画面【左部】の赤い丸に鼻先を向けてください', 1200);
+                    else if(step === 'left') runCalibrationStep('right', 80, 50, '【5/7】顔を右に向けて、\n画面【右部】の赤い丸に鼻先を向けてください', 1200);
+                    // 目の測定は長めの3秒間
+                    else if(step === 'right') runCalibrationStep('eye_open', 50, 50, '【6/7】リラックスして普通に\n目を開いたまま画面を見てください', 3000);
+                    else if(step === 'eye_open') runCalibrationStep('eye_closed', 50, 50, '【7/7】決定に使う片目を\nギュッと閉じたままにしてください', 3000);
+                    else if(step === 'eye_closed') { 
+                        
+                        // ★ 自動学習：大きく変化したほうの目を「操作用の目」として登録 ★
+                        let openL = calibData.eye_open.ear_l;
+                        let openR = calibData.eye_open.ear_r;
+                        let closeL = calibData.eye_closed.ear_l;
+                        let closeR = calibData.eye_closed.ear_r;
+                        
+                        let diffL = openL - closeL;
+                        let diffR = openR - closeR;
+                        
+                        window.activeEye = diffL > diffR ? 'left' : 'right';
+                        window.eyeOpenBase = window.activeEye === 'left' ? openL : openR;
+                        window.eyeClosedBase = window.activeEye === 'left' ? closeL : closeR;
+                        
+                        // 測定エラー（瞬きなど）の場合はデフォルト値を設定
+                        if (Math.max(diffL, diffR) < 0.03) {
+                            window.eyeOpenBase = 0.25;
+                            window.eyeClosedBase = 0.08;
+                        }
+                        
+                        calibTarget.style.display = 'none'; 
+                        startPracticePhase(); 
+                    }
+                }, durationMs); 
+            }, 1000); // 準備時間1秒
         }
 
         function startPracticePhase() {
@@ -567,7 +613,7 @@
             if (gameState === 'loading') {
                 gameState = 'ready'; 
                 document.getElementById('status-text').innerText = "準備完了";
-                document.getElementById('status-sub').innerText = "見つめたボタンが光ります。「右目を閉じて、開く」と決定します。\n音声の準備をするため、下のボタンを押してください。";
+                document.getElementById('status-sub').innerText = "見つめたボタンが光ります。「目を閉じて、開く」と決定します。\n音声の準備をするため、下のボタンを押してください。";
                 startBtn.style.display = 'block';
             }
 
@@ -580,8 +626,12 @@
 
                 if (gameState.startsWith('calib_')) {
                     if (calibInstruction.innerText.includes("記録中")) {
-                        // 位置と一緒に目の開き具合（EAR）もバッファに記憶させる
-                        calibBuffer.push({ x: nose.x, y: nose.y, ear: getRightEyeEAR(landmarks) });
+                        // 両目のデータもバッファに記憶させる
+                        calibBuffer.push({ 
+                            x: nose.x, y: nose.y, 
+                            ear_l: getEyeEAR(landmarks, 'left'),
+                            ear_r: getEyeEAR(landmarks, 'right')
+                        });
                     }
                 } 
                 else if (gameState.startsWith('practice_') || gameState === 'playing' || gameState === 'confirm_clear') {
@@ -674,32 +724,25 @@
                     }
 
                     // --- ★ 動的閾値（パーソナルキャリブレーション）の計算 ★ ---
-                    const eyeOpenBase = calibData.eye_open ? calibData.eye_open.ear : 0.25;
-                    const eyeClosedBase = calibData.eye_closed ? calibData.eye_closed.ear : 0.05;
+                    const eyeOpenBase = window.eyeOpenBase || 0.25;
+                    const eyeClosedBase = window.eyeClosedBase || 0.05;
                     
-                    // ベース値から安全マージンを取って境界線を引く
                     let EYE_OPEN_THRESH = eyeClosedBase + (eyeOpenBase - eyeClosedBase) * 0.6;  
                     let EYE_CLOSED_THRESH = eyeClosedBase + (eyeOpenBase - eyeClosedBase) * 0.3;
                     
-                    // エラー防止（目がうまく測定できなかった場合のデフォルト値）
-                    if (eyeOpenBase - eyeClosedBase < 0.02) {
-                        EYE_OPEN_THRESH = 0.16;
-                        EYE_CLOSED_THRESH = 0.12;
-                    }
-
-                    // フリック展開中（顔を斜めに向けたりする時）はウインク維持の判定を甘くする
                     if (activeFlickBase) {
-                        EYE_CLOSED_THRESH = eyeClosedBase + (eyeOpenBase - eyeClosedBase) * 0.5;
+                        EYE_CLOSED_THRESH = eyeClosedBase + (eyeOpenBase - eyeClosedBase) * 0.45;
                     }
 
-                    const eyeRatio = getRightEyeEAR(landmarks);
+                    // 自動判定された操作用の目の値を取得
+                    const eyeRatio = getEyeEAR(landmarks, window.activeEye || 'left');
 
                     if (eyeRatio < EYE_CLOSED_THRESH) {
                         eyeClosedFrames++;
                         eyeOpenFrames = 0; 
                         
-                        // 無意識のまばたきを弾くため、3フレーム（約0.1秒）連続で閉じたら「意図的なウインク」と判定
-                        if (eyeClosedFrames >= 3 && !isEyeClosed) {
+                        // 判定を少し優しく（3フレームから2フレームに緩和）
+                        if (eyeClosedFrames >= 2 && !isEyeClosed) {
                             isEyeClosed = true;
                             if (gameState.startsWith('practice_')) cursor.classList.add('ready');
                             if (hoveredElement) hoveredElement.classList.add('ready');
@@ -713,7 +756,6 @@
                         eyeClosedFrames = 0;
                         if (isEyeClosed) {
                             eyeOpenFrames++;
-                            // 1フレームでも開いたら即座に決定
                             if (eyeOpenFrames >= 1) {
                                 isEyeClosed = false;
                                 eyeOpenFrames = 0;
