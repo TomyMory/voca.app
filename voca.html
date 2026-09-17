@@ -75,7 +75,7 @@
 
         @media (max-width: 600px) { :root { --flick-size: 65px; --flick-spread: 75px; } }
 
-        /* --- 全消し確認＆リセット --- */
+        /* --- 全消し確認ポップアップ --- */
         #confirm-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 4000; display: none; flex-direction: column; justify-content: center; align-items: center; }
         .confirm-box { background: #ecf0f1; border-radius: 15px; padding: 30px; text-align: center; width: 80%; max-width: 500px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         .confirm-msg { font-size: clamp(20px, 6vw, 32px); color: #2c3e50; font-weight: bold; margin-bottom: 30px; line-height: 1.4; }
@@ -84,6 +84,7 @@
         .btn-yes { background: #e74c3c; color: white; }
         .btn-no { background: #95a5a6; color: white; }
 
+        /* --- 中心リセット カウントダウン画面 --- */
         #reset-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 4500; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; }
         #reset-overlay h1 { font-size: clamp(24px, 7vw, 40px); color: #f1c40f; margin-bottom: 10px; text-align: center; }
         #reset-timer { font-size: 100px; font-weight: bold; color: #e74c3c; }
@@ -94,7 +95,6 @@
         #warning-msg { position: absolute; top: 40%; width: 100%; text-align: center; color: #ff3b3b; font-size: clamp(20px, 6vw, 32px); font-weight: bold; background: rgba(0,0,0,0.7); padding: 20px 0; display: none; z-index: 3000; }
 
         #calib-target { position: absolute; width: 40px; height: 40px; background-color: #e74c3c; border: 4px solid white; border-radius: 50%; transform: translate(-50%, -50%); display: none; z-index: 2100; box-shadow: 0 0 15px #e74c3c; transition: all 0.1s; }
-        
         #practice-target { position: absolute; width: clamp(120px, 35vw, 180px); height: clamp(120px, 35vw, 180px); background-color: #e67e22; border: 4px solid white; border-radius: 20px; transform: translate(-50%, -50%); display: none; z-index: 2100; box-shadow: 0 0 20px rgba(230,126,34,0.8); flex-direction: column; justify-content: center; align-items: center; font-size: clamp(14px, 4.5vw, 22px); font-weight: bold; text-align: center; color: white; transition: all 0.1s ease-out; white-space: pre-wrap; line-height: 1.3; }
         #calib-instruction { position: absolute; top: 10%; width: 100%; text-align: center; font-size: clamp(16px, 5vw, 28px); font-weight: bold; color: #f1c40f; display: none; z-index: 2100; text-shadow: 2px 2px 4px #000; white-space: pre-wrap; pointer-events: none; }
         
@@ -108,21 +108,23 @@
             <div class="text-display">
                 <span id="confirmed-text"></span><span id="current-input"></span>
             </div>
+            
             <div id="btn-reset-center" class="top-btn hit-target top-hit" data-action="reset_center">
                 <div class="main-char">🎯</div><div class="sub-chars">位置ﾘｾｯﾄ</div>
             </div>
+
             <div id="btn-clear-all" class="top-btn hit-target top-hit" data-action="clear">
                 <div class="main-char">✖</div><div class="sub-chars">全消し</div>
             </div>
         </div>
         <div id="suggestion-bar"></div>
         
+        <!-- センサーメーター -->
         <div id="sensor-bar">
             <div id="sensor-gauge">
                 <div id="sensor-fill" class="sensor-color-open"></div>
-                <!-- ★ メーターの閾値（判定ライン）を55%と70%に表示 -->
-                <div id="line-close" class="sensor-line" style="left: 55%;"></div>
-                <div id="line-open" class="sensor-line" style="left: 70%;"></div>
+                <div id="line-close" class="sensor-line" style="left: 45%;"></div>
+                <div id="line-open" class="sensor-line" style="left: 55%;"></div>
             </div>
             <div id="sensor-text">センサー待機中...</div>
         </div>
@@ -222,10 +224,9 @@
         let currentMode = 'hiragana';
 
         window.latestNoseX = 0; window.latestNoseY = 0;
-        
         window.eyeJustFailedTimer = 0;
         
-        // ★ 操作用の目を、画像左側の目（鏡から見て左＝実際の右目）に【完全固定】 ★
+        // 左目（鏡から見て左＝実際の右目）のみのデータを採用
         window.eyeOpenBase = 0;   
         window.eyeClosedBase = 0;
 
@@ -328,13 +329,13 @@
         const dakutenCycle = {
             'か':'が','が':'か','き':'ぎ','ぎ':'き','く':'ぐ','ぐ':'く','け':'げ','げ':'け','こ':'ご','ご':'こ',
             'さ':'ざ','ざ':'さ','し':'じ','じ':'し','す':'ず','ず':'す','せ':'ぜ','ぜ':'せ','そ':'ぞ','ぞ':'そ',
-            'た':'だ','だ':'た','ち':'ぢ','ぢ':'ち','つ':'づ','づ':'つ','て':'で','て':'で','と':'ど','ど':'と',
+            'た':'だ','だ':'た','ち':'ぢ','ぢ':'ち','つ':'づ','づ':'つ','て':'で','で':'て','と':'ど','ど':'と',
             'は':'ば','ば':'ぱ','ぱ':'は','ひ':'び','び':'ぴ','ぴ':'ひ','ふ':'ぶ','ぶ':'ぷ','ぷ':'ふ',
             'へ':'べ','べ':'ぺ','ぺ':'へ','ほ':'ぼ','ぼ':'ぽ','ぽ':'ほ',
             'あ':'ぁ','ぁ':'あ','い':'ぃ','ぃ':'い','う':'ぅ','ぅ':'う','え':'ぇ','ぇ':'え','お':'ぉ','ぉ':'お',
             'や':'ゃ','ゃ':'や','ゆ':'ゅ','ゅ':'ゆ','よ':'ょ','ょ':'よ','つ':'っ','っ':'つ','わ':'ゎ','ゎ':'わ',
             'a':'A','A':'a','b':'B','B':'b','c':'C','C':'c','d':'D','D':'d','e':'E','E':'e','f':'F','F':'f',
-            'g':'G','G':'g','h':'H','H':'h','i':'I','I':'i','j':'J','J':'j','k':'K','K':'k','l':'L','L':'l',
+            'g':'G','G','g','h':'H','H':'h','i':'I','I':'i','j':'J','J':'j','k':'K','K':'k','l':'L','L':'l',
             'm':'M','M':'m','n':'N','N':'n','o':'O','O':'o','p':'P','P':'p','q':'Q','Q':'q','r':'R','R':'r',
             's':'S','S':'s','t':'T','T':'t','u':'U','U':'u','v':'V','V':'v','w':'W','W':'w','x':'X','X':'x',
             'y':'Y','Y':'y','z':'Z','Z':'z'
@@ -455,7 +456,7 @@
             saveHistory(); currentInput += char; updateTextDisplay(); fetchSuggestions();
         }
 
-        // --- ★ 目の歪み補正計算（画像左側の目＝ユーザーの右目に完全固定） ★ ---
+        // 画像左側の目（ユーザーの右目）に固定
         function getEyeEAR(landmarks) {
             const aspectX = 1.333; 
             function distCorrected(p1, p2) {
@@ -463,7 +464,6 @@
                 const dy = (p1.y - p2.y);
                 return Math.hypot(dx, dy); 
             }
-            // 画像左側（ユーザーの右目）の6点計測
             const h1 = distCorrected(landmarks[160], landmarks[144]);
             const h2 = distCorrected(landmarks[158], landmarks[153]);
             const w  = distCorrected(landmarks[33], landmarks[133]);
@@ -504,7 +504,6 @@
             statusOverlay.style.background = 'rgba(0,0,0,0.5)';
             document.getElementById('status-text').style.display = 'none'; document.getElementById('status-sub').style.display = 'none'; 
             startBtn.style.display = 'none';
-            // 全7ステップ
             runCalibrationStep('center', 50, 50, '【1/7】顔を動かして、\n画面【中央】の赤い丸に鼻先を向けてください', 1200);
         });
 
@@ -548,14 +547,12 @@
                     else if(step === 'eye_open') runCalibrationStep('eye_closed', 50, 50, '【7/7】決定に使う「右目」だけを\n「軽く」閉じたままにしてください', 3000);
                     else if(step === 'eye_closed') { 
                         
-                        // ★ 完全固定：画像左側の目（ユーザーの右目）のみのデータを採用 ★
                         let openEar = calibData.eye_open.ear;
                         let closeEar = calibData.eye_closed.ear;
                         
                         window.eyeOpenBase = openEar;
                         window.eyeClosedBase = closeEar;
                         
-                        // 万が一測定に失敗した場合はデフォルト値を入れる
                         if (openEar - closeEar < 0.03) {
                             window.eyeOpenBase = 0.25;
                             window.eyeClosedBase = 0.08;
@@ -613,7 +610,7 @@
 
         function hideFlickMenu() { activeFlickBase = null; flickOverlay.style.display = 'none'; }
 
-        // --- ★ センサーメーターの更新関数 ★ ---
+        // --- ★ センサーメーターの更新 ★ ---
         function updateSensorDisplay(earRatio) {
             const fill = document.getElementById('sensor-fill');
             const text = document.getElementById('sensor-text');
@@ -626,26 +623,32 @@
                 return;
             }
 
-            let earRange = window.eyeOpenBase - window.eyeClosedBase;
+            // ★ キャリブレーション時の見開きすぎを補正（MAXを15%オフに下げる）★
+            const rawEyeOpenBase = window.eyeOpenBase;
+            const eyeClosedBase = window.eyeClosedBase;
+            const eyeOpenBase = eyeClosedBase + (rawEyeOpenBase - eyeClosedBase) * 0.85;
+
+            let earRange = eyeOpenBase - eyeClosedBase;
             if (earRange < 0.02) earRange = 0.02;
             
-            let normalizedEAR = (earRatio - window.eyeClosedBase) / earRange;
+            let normalizedEAR = (earRatio - eyeClosedBase) / earRange;
             let percent = Math.round(normalizedEAR * 100);
             let displayPct = Math.max(0, Math.min(100, percent));
             
             fill.style.width = `${displayPct}%`;
 
-            // ★ 判定ラインを少し甘く変更（50 -> 55）★
-            let THRESH_CLOSE = activeFlickBase ? 65 : 55;
-            let THRESH_OPEN = 70;
+            // ★ 判定ラインを厳格化（半目ゾーンを狭くする） ★
+            let THRESH_CLOSE = activeFlickBase ? 55 : 45; // 45%で完全に閉じたとみなす
+            let THRESH_OPEN = activeFlickBase ? 65 : 55;  // 55%で開いた（緑）とみなす
             
             document.getElementById('line-close').style.left = `${THRESH_CLOSE}%`;
+            document.getElementById('line-open').style.left = `${THRESH_OPEN}%`;
             
             if (window.eyeJustFailedTimer > Date.now()) {
                 text.innerText = `❌もっとゆっくり閉じて！`;
                 text.style.color = '#ff9ff3';
             }
-            else if (percent < THRESH_CLOSE) {
+            else if (percent <= THRESH_CLOSE) {
                 fill.className = 'sensor-color-close';
                 text.innerText = `閉: ${displayPct}% (開くと決定)`;
                 text.style.color = '#ffcccc';
@@ -670,7 +673,7 @@
                 if (window.eyeJustFailedTimer > Date.now()) {
                     msg += "\n\n❌ゆっくり\n閉じて！";
                 } else if (isEyeClosed) {
-                    if (percent > THRESH_OPEN) {
+                    if (percent >= THRESH_OPEN) {
                         msg = "決定！";
                     } else if (percent > THRESH_CLOSE) {
                         msg = "もっとパチッと\n開いて！";
@@ -678,12 +681,14 @@
                         msg = "そのまま\n開いて決定！";
                     }
                 } else {
-                    if (percent <= THRESH_OPEN && percent > THRESH_CLOSE) {
+                    if (percent < THRESH_OPEN && percent > THRESH_CLOSE) {
                         msg += "\n\n⚠️半目です\nもっとギュッと!";
                     }
                 }
                 pt.innerText = msg;
             }
+            
+            return { normalizedEAR, THRESH_CLOSE, THRESH_OPEN };
         }
 
         function onResults(results) {
@@ -703,7 +708,6 @@
 
                 if (gameState.startsWith('calib_')) {
                     if (calibInstruction.innerText.includes("記録中")) {
-                        // 完全に右目（画像左側）のデータだけを記憶する
                         calibBuffer.push({ 
                             x: nose.x, y: nose.y, 
                             ear: getEyeEAR(landmarks)
@@ -800,23 +804,10 @@
                         hoveredElement = null;
                     }
 
-                    // --- ★ EARの計算とメーターの更新 ★ ---
-                    const eyeOpenBase = window.eyeOpenBase || 0.25;
-                    const eyeClosedBase = window.eyeClosedBase || 0.05;
-                    let earRange = eyeOpenBase - eyeClosedBase;
-                    if (earRange < 0.02) earRange = 0.02;
-                    
                     const eyeRatio = getEyeEAR(landmarks);
-                    updateSensorDisplay(eyeRatio); 
+                    const { normalizedEAR, THRESH_CLOSE, THRESH_OPEN } = updateSensorDisplay(eyeRatio); 
 
-                    let normalizedEAR = (eyeRatio - eyeClosedBase) / earRange;
-                    
-                    // ★ 判定ラインをさらに少し甘く（50% -> 55%）★
-                    let THRESH_CLOSE = 0.55; 
-                    let THRESH_OPEN = 0.70;
-                    if (activeFlickBase) { THRESH_CLOSE = 0.65; } // フリック中は甘め
-
-                    if (normalizedEAR < THRESH_CLOSE) {
+                    if (normalizedEAR <= THRESH_CLOSE) {
                         eyeClosedFrames++;
                         eyeOpenFrames = 0; 
                         
@@ -830,7 +821,7 @@
                             }
                         }
                     } 
-                    else if (normalizedEAR > THRESH_OPEN) {
+                    else if (normalizedEAR >= THRESH_OPEN) {
                         if (eyeClosedFrames === 1 && !isEyeClosed) {
                             window.eyeJustFailedTimer = Date.now() + 1500; 
                         }
