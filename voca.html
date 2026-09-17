@@ -223,10 +223,9 @@
 
         window.latestNoseX = 0; window.latestNoseY = 0;
         
-        // ★ まばたき誤爆防止のための長押しフレーム数（6フレーム ＝ 約0.2秒）
+        // まばたき誤爆防止のための長押しフレーム数（6コマ ＝ 約0.2秒）
         const WINK_FRAMES_THRESHOLD = 6;
         
-        // 左目（鏡から見て左＝実際の右目）のみのデータを採用
         window.eyeOpenBase = 0;   
         window.eyeClosedBase = 0;
 
@@ -456,20 +455,19 @@
             saveHistory(); currentInput += char; updateTextDisplay(); fetchSuggestions();
         }
 
-        // 顔の高さに対する相対サイズで目の開き具合を計算
+        // 目の歪み補正計算（画像左側の目＝ユーザーの右目に完全固定）
         function getEyeEAR(landmarks) {
             const aspectX = 1.333; 
             function distCorrected(p1, p2) {
                 const dx = (p1.x - p2.x) * aspectX;
                 const dy = (p1.y - p2.y);
-                return Math.hypot(dx, dy); 
+                const dz = (p1.z - p2.z) * aspectX; 
+                return Math.sqrt(dx*dx + dy*dy + dz*dz);
             }
             const h1 = distCorrected(landmarks[160], landmarks[144]);
             const h2 = distCorrected(landmarks[158], landmarks[153]);
-            const eyeHeight = (h1 + h2) / 2.0;
-
-            const faceHeight = distCorrected(landmarks[10], landmarks[152]);
-            return (eyeHeight / faceHeight) * 100;
+            const w  = distCorrected(landmarks[33], landmarks[133]);
+            return (h1 + h2) / (2.0 * (w || 0.001));
         }
 
         let gameState = 'loading'; 
@@ -552,16 +550,29 @@
                         let openEar = calibData.eye_open.ear;
                         let closeEar = calibData.eye_closed.ear;
                         
-                        if (openEar - closeEar < 0.5) {
-                            window.eyeOpenBase = 2.5; 
-                            window.eyeClosedBase = 0.5;
+                        // ★ 修正：目を閉じていない場合はやり直しさせる ★
+                        if (openEar - closeEar < 0.05) {
+                            try { 
+                                const ut = new SpeechSynthesisUtterance('右目を閉じてください');
+                                ut.lang = 'ja-JP';
+                                speechSynthesis.speak(ut); 
+                            } catch(e){}
+                            
+                            calibInstruction.innerText = "❌右目が閉じていないようです。\nもう一度、右目を閉じてください";
+                            calibInstruction.style.color = "#ff9ff3"; 
+                            
+                            setTimeout(() => {
+                                calibInstruction.style.color = "#f1c40f"; 
+                                runCalibrationStep('eye_closed', 50, 50, '【7/7】決定に使う「右目」だけを\n「軽く」閉じたままにしてください', 3000);
+                            }, 3000);
+                            return; // ここで処理を止めてやり直す
                         } else {
                             window.eyeOpenBase = closeEar + (openEar - closeEar) * 0.85;
                             window.eyeClosedBase = closeEar;
+                            
+                            calibTarget.style.display = 'none'; 
+                            startPracticePhase(); 
                         }
-                        
-                        calibTarget.style.display = 'none'; 
-                        startPracticePhase(); 
                     }
                 }, durationMs); 
             }, 1000); 
@@ -612,16 +623,16 @@
 
         function hideFlickMenu() { activeFlickBase = null; flickOverlay.style.display = 'none'; }
 
-        // --- ★ センサーメーターの更新 ★ ---
+        // --- センサーメーターの更新 ---
         function updateSensorDisplay(earRatio) {
             const fill = document.getElementById('sensor-fill');
             const text = document.getElementById('sensor-text');
 
             if (gameState.startsWith('calib_') || !window.eyeOpenBase) {
-                let pct = Math.max(0, Math.min(100, (earRatio / 4.0) * 100)); 
+                let pct = Math.max(0, Math.min(100, (earRatio / 0.30) * 100)); 
                 fill.style.width = `${pct}%`;
                 fill.className = 'sensor-color-open';
-                text.innerText = `準備中: ${(earRatio).toFixed(2)}%`;
+                text.innerText = `準備中: ${(earRatio).toFixed(3)}`;
                 return;
             }
 
@@ -629,7 +640,7 @@
             const eyeClosedBase = window.eyeClosedBase;
 
             let earRange = eyeOpenBase - eyeClosedBase;
-            if (earRange < 0.5) earRange = 0.5;
+            if (earRange < 0.05) earRange = 0.05;
             
             let normalizedEAR = (earRatio - eyeClosedBase) / earRange;
             let percent = Math.round(normalizedEAR * 100);
@@ -645,7 +656,6 @@
             
             if (percent <= THRESH_CLOSE) {
                 fill.className = 'sensor-color-close';
-                // まだ青く光ってない（フレーム数が足りない）時は「キープ」を促す
                 text.innerText = isEyeClosed ? `閉: 青く光っています！` : `閉: ${displayPct}% (青くなるまでキープ)`;
                 text.style.color = '#ffcccc';
             } else if (percent < THRESH_OPEN) {
@@ -807,7 +817,6 @@
                         eyeClosedFrames++;
                         eyeOpenFrames = 0; 
                         
-                        // ★ 無意識のまばたきを弾くため、6フレーム（約0.2秒）連続で閉じたら「意図的なウインク」と判定 ★
                         if (eyeClosedFrames >= WINK_FRAMES_THRESHOLD && !isEyeClosed) {
                             isEyeClosed = true;
                             if (gameState.startsWith('practice_')) cursor.classList.add('ready');
@@ -819,7 +828,6 @@
                         }
                     } 
                     else if (normalizedEAR >= THRESH_OPEN) {
-                        // エラー警告は廃止。通常のまばたきは何もしないでやり過ごす。
                         eyeClosedFrames = 0;
                         
                         if (isEyeClosed) {
@@ -868,7 +876,6 @@
                     }
                 }
             } else {
-                // 顔未認識時のエラー非表示
             }
         }
 
